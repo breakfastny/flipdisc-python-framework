@@ -5,7 +5,8 @@ from flipdisc._particle import lib
 __all__ = ["Emitter"]
 
 
-class Emitter:
+class Emitter(object):
+
     def __init__(self, start_time=True):
         self._ctx = lib.emitter_context()
         if start_time:

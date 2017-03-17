@@ -2,7 +2,7 @@ import cv2
 import numpy
 
 
-class OpticalFlow:
+class OpticalFlow(object):
 
     def __init__(self, trackrate, max_features, min_threshold):
         self._trackrate = trackrate
