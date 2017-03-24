@@ -1,0 +1,7 @@
+## Setup
+
+Install the flipdisc python package:
+
+```
+make
+```
