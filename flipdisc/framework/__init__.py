@@ -1,1 +1,1 @@
-from .framework import Application, INPUT_STREAM, OUTPUT_STREAM
+from .common import INPUT_STREAM, OUTPUT_STREAM

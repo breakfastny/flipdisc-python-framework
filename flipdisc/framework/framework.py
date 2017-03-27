@@ -4,6 +4,7 @@ import errno
 import struct
 import socket
 import collections
+from functools import partial
 
 import numpy
 import zmq
@@ -11,10 +12,7 @@ from zmq.eventloop import zmqstream, ioloop
 from tornado import gen as tornado_gen
 from toredis import Client as RedisClient
 
-from .common import REDIS_KEYS
-
-INPUT_STREAM = "IN_STREAM"
-OUTPUT_STREAM = "OUT_STREAM"
+from .common import REDIS_KEYS, INPUT_STREAM, OUTPUT_STREAM
 
 ioloop.install()
 
@@ -31,12 +29,12 @@ class Application(object):
 
         * config can be either a string or a dict, if it's a string
           json.load(open(config)) will be used.
-          + The config must have at least a "output_stream" key, but usually
-          "input_stream" will also be present.
-          + If "redis" is present it will be used to configure the redis
+          + If "output_stream" or "input_stream" keys are present, they
+          must specify at least a "width" and "height" subkeys.
+          + If "redis" key is present it will be used to configure the redis
           client.
-          + The "settings" key must be used for settings that can be controlled
-          through the http server.
+          + The "settings" key must be used for holding settings specific
+          to the app that can be updated while it's running.
           The app is free to use any other keys.
           Accessible through instance.config
 
@@ -50,12 +48,17 @@ class Application(object):
         * if setup_output is True a PUB socket for the output stream will be
           configured using config["output_stream"]
         """
+        config = config or {}
         self.name = name
         self.verbose = verbose
         if not isinstance(config, dict):
             # Load config from json file.
             config = json.load(open(config))
         self.config = config
+
+        sub_channels = []
+        if self.name:
+            sub_channels.append(REDIS_KEYS.APP_CHANNEL + self.name)
 
         self._input_callback = None
 
@@ -64,6 +67,7 @@ class Application(object):
             input_height = config['input_stream']['height']
             self._bgr_shape = (input_height, input_width, 3)
             self._depth_shape = (input_height, input_width)
+            sub_channels.append(REDIS_KEYS.SYS_INPUT_CHANNEL)
         else:
             setup_input = False
             self._bgr_shape = None
@@ -71,11 +75,16 @@ class Application(object):
         self._bgr_dtype = 'uint8'
         self._depth_dtype = 'uint16'
 
-        output_width = config['output_stream']['width']
-        output_height = config['output_stream']['height']
+        if 'output_stream' in config:
+            output_width = config['output_stream']['width']
+            output_height = config['output_stream']['height']
+            self._bin_shape = (output_height, output_width)
+            self._out_transition = config['output_stream'].get('transition', False)
+        else:
+            setup_output = False
+            self._bin_shape = None
+            self._out_transition = False
         self._bin_dtype = 'uint8'
-        self._bin_shape = (output_height, output_width)
-        self._out_transition = config['output_stream'].get('transition', False)
         if self._out_transition and not self.name:
             raise ValueError("App name is required to use transitions")
 
@@ -88,25 +97,29 @@ class Application(object):
         if setup_output:
             self.setup_output()
 
-        self._cb_app_update = None
+        self._cb_app_heartbeat = None
         self._periodic_callbacks = {}
 
         use_redis = True
-        redis_cfg = {'host': 'localhost', 'port': 6379}
+        redis_cfg = {'host': 'localhost', 'port': 6379, 'callback': self._on_redis_connect}
         if 'redis' in config:
-            redis_cfg = {
-                'host': config['redis']['host'],
-                'port': config['redis']['port'],
-                'callback': self._on_redis_connect
-            }
+            if 'host' in config['redis']:
+                redis_cfg['host'] = config['redis']['host']
+            if 'port' in config['redis']:
+                redis_cfg['port'] = config['redis']['port']
             use_redis = config['redis'].get('enabled', True)
         if not use_redis:
             self._red = None
             return
 
         self._red = RedisClient()
+        self._red_sub = RedisClient()
         try:
+            # Keep one redis connection for regular commands.
             self._red.connect(**redis_cfg)
+            # And another redis connection for pubsub.
+            cb = partial(redis_cfg.pop('callback'), sub_channels=sub_channels)
+            self._red_sub.connect(callback=cb, **redis_cfg)
         except socket.error as err:
             if err.errno == errno.ECONNREFUSED:
                 raise IOError("Could not connect to redis at {host}:{port}".format(**redis_cfg))
@@ -117,6 +130,7 @@ class Application(object):
         Configure a ZMQ PUB socket for the input stream.
         """
         if self._in_stream:
+            # Already configured the input stream, nothing to do.
             return
 
         sock_address = self.config[cfg]['socket']
@@ -127,6 +141,7 @@ class Application(object):
         else:
             in_socket.connect(sock_address)
         self._in_stream = zmqstream.ZMQStream(in_socket)
+
         callback = getattr(self, '_input_callback_%s' % cfg, None)
         if callback is None:
             raise Exception('Implementation not available for %s configuration' % cfg)
@@ -234,20 +249,11 @@ class Application(object):
         self._out_socket.send_multipart(data, copy=False)
         return self._sent
 
-    @tornado_gen.engine
-    def _app_update_settings(self):
-        appname = self.name
-
-        # Check for new app settings.
-        while True:
-            # If there's more than one update, keep the last one.
-            result = yield tornado_gen.Task(self._red.rpop, REDIS_KEYS['APP_QUEUE'] % appname)
-            if result is None:
-                break
-            _update_settings(self.config['settings'], json.loads(result), self.verbose)
-
-        self.config['timestamp'] = time.time()
-        self._red.hset(REDIS_KEYS['APPS'], appname, json.dumps(self.config))
+    def notify(self, channel, data):
+        """Send json.dumps(data) to a channel using redis pubsub."""
+        if not self._red:
+            raise Exception("redis not enabled")
+        return self._red.publish(channel, json.dumps(data))
 
     def add_periodic_callback(self, function, float_sec):
         """
@@ -278,9 +284,9 @@ class Application(object):
         redis if it's enabled.
         """
         if self.name and self._red is not None:
-            self._cb_app_update = ioloop.PeriodicCallback(
-                    self._app_update_settings, 60)  # call each 60ms
-            self._cb_app_update.start()
+            self._cb_app_heartbeat = ioloop.PeriodicCallback(
+                    self._app_heartbeat, 1000)
+            self._cb_app_heartbeat.start()
         for cb in self._periodic_callbacks.values():
             cb.start()
         ioloop.IOLoop.instance().start()
@@ -292,12 +298,31 @@ class Application(object):
         """
         for cb in self._periodic_callbacks.values():
             cb.stop()
-        if self._cb_app_update:
-            self._cb_app_update.stop()
+        if self._cb_app_heartbeat:
+            self._cb_app_heartbeat.stop()
         if self.name and self._red is not None:
-            self._red.hdel(REDIS_KEYS['APPS'], self.name)
+            # Unregister app from redis.
+            self._red.hdel(REDIS_KEYS.APPS, self.name)
 
-    def _on_redis_connect(self):
+    def _app_heartbeat(self):
+        # Update register on redis to indicate that the app is running well.
+        self.config['timestamp'] = time.time()
+        self._red.hset(REDIS_KEYS.APPS, self.name, json.dumps(self.config))
+
+    def _on_redis_message(self, msg):
+        msg_type, msg_channel, content = msg
+        if msg_type != 'message':
+            return
+
+        data = json.loads(content)
+        if msg_channel.startswith(REDIS_KEYS.APP_CHANNEL):
+            # Update app settings.
+            _update_settings(self.config['settings'], data)
+            self._app_heartbeat()
+
+        # XXX handle other kinds of updates (e.g. live stream settings).
+
+    def _on_redis_connect(self, sub_channels=None):
         if 'redis' in self.config:
             db = self.config['redis'].get('db')
             if db:
@@ -306,8 +331,11 @@ class Application(object):
             if pwd:
                 self._red.auth(pwd)
 
+        if sub_channels:
+            self._red_sub.subscribe(sub_channels, self._on_redis_message)
 
-def _update_settings(settings, new, verbose=False):
+
+def _update_settings(settings, new):
     # Restrict key updates to those that already exist and
     # enforce the values to be of same type.
     def update(orig_data, new_data):

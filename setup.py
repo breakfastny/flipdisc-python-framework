@@ -22,7 +22,7 @@ def run_setup(build_cext):
 
     setup(
         name='flipdisc',
-        version='0.1.1',
+        version='0.1.2',
         packages=["flipdisc", "flipdisc.framework"],
         setup_requires=["cffi>=1.0.0"],
         cffi_modules=["build_particle.py:ffibuilder"],
@@ -30,10 +30,11 @@ def run_setup(build_cext):
         zip_safe=False,
         extras_require={
             'app_framework': [
-                'numpy>=1.11.0',
-                'pyzmq>=14.7.0',
-                'tornado>=4.3',
-                'toredis>=0.1.2',
+                'numpy==1.12.1',
+                'pyzmq==16.0.2',
+                'tornado==4.4.2',
+                'toredis==0.1.2',
+                'attrdict==2.0.0',
             ]
         },
         **extra
