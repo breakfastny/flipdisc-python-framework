@@ -59,8 +59,8 @@ def copy_to_center(dest, img):
     """
     Copy img to the center of dest.
 
-	* dest must be at least as big as img
-	* img and dest should both be numpy arrays
+    * dest must be at least as big as img
+    * img and dest should both be numpy arrays
     """
     dest_height, dest_width = dest.shape
     src_height, src_width = img.shape
