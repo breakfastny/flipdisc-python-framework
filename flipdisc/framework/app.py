@@ -9,7 +9,6 @@ from functools import partial
 import numpy
 import zmq
 from zmq.eventloop import zmqstream, ioloop
-from tornado import gen as tornado_gen
 from toredis import Client as RedisClient
 
 from .common import REDIS_KEYS, INPUT_STREAM, OUTPUT_STREAM
