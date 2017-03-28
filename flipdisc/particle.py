@@ -1,5 +1,3 @@
-import time
-
 from flipdisc._particle import lib
 
 __all__ = ["Emitter"]
@@ -7,24 +5,24 @@ __all__ = ["Emitter"]
 
 class Emitter(object):
 
-    def __init__(self, start_time=True):
+    def __init__(self, step=1./30):
         self._ctx = lib.emitter_context()
-        if start_time:
-            self._start = time.time()
-        else:
-            self._start = None
+        self._step = step
+        self._elapsed = 0.0
 
     def __del__(self):
         lib.emitter_free(self._ctx)
 
-    def update(self):
-        if self._start is not None:
-            self.update_elapsed_time(time.time() - self._start)
+    def update(self, step=None):
+        if step is None:
+            step = self._step
+        self._elapsed += step
+        self.set_elapsed_time(self._elapsed)
         lib.emitter_update(self._ctx)
 
-    def update_elapsed_time(self, t):
+    def set_elapsed_time(self, elapsed):
         pctx = self._ctx.pctx
-        pctx.elapsed_time = t
+        pctx.elapsed_time = elapsed
 
     def set_size(self, height, width):
         pctx = self._ctx.pctx
