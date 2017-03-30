@@ -9,9 +9,11 @@ from functools import partial
 import numpy
 import zmq
 from zmq.eventloop import zmqstream, ioloop
-from toredis import Client as RedisClient
 
+from .red import ReconnectingRedis
 from .common import REDIS_KEYS, INPUT_STREAM, OUTPUT_STREAM
+
+__all__ = ['Application']
 
 ioloop.install()
 
@@ -55,6 +57,7 @@ class Application(object):
             config = json.load(open(config))
         self.config = config
 
+        # List of redis channels to subscribe.
         sub_channels = []
         if self.name:
             sub_channels.append(REDIS_KEYS.APP_CHANNEL + self.name)
@@ -100,29 +103,15 @@ class Application(object):
         self._periodic_callbacks = {}
 
         use_redis = True
-        redis_cfg = {'host': 'localhost', 'port': 6379, 'callback': self._on_redis_connect}
         if 'redis' in config:
-            if 'host' in config['redis']:
-                redis_cfg['host'] = config['redis']['host']
-            if 'port' in config['redis']:
-                redis_cfg['port'] = config['redis']['port']
             use_redis = config['redis'].get('enabled', True)
         if not use_redis:
             self._red = None
-            return
-
-        self._red = RedisClient()
-        self._red_sub = RedisClient()
-        try:
-            # Keep one redis connection for regular commands.
-            self._red.connect(**redis_cfg)
-            # And another redis connection for pubsub.
-            cb = partial(redis_cfg.pop('callback'), sub_channels=sub_channels)
-            self._red_sub.connect(callback=cb, **redis_cfg)
-        except socket.error as err:
-            if err.errno == errno.ECONNREFUSED:
-                raise IOError("Could not connect to redis at {host}:{port}".format(**redis_cfg))
-            raise
+            self._red_sub = None
+        else:
+            self._red = ReconnectingRedis(self.verbose)
+            self._red_sub = ReconnectingRedis(self.verbose, 'pubsub')
+            self._setup_redis(sub_channels)
 
     def setup_input(self, cfg='input_stream', topic=INPUT_STREAM, bind=False):
         """
@@ -187,7 +176,9 @@ class Application(object):
         bin_image = numpy.frombuffer(binimage_frame.bytes, dtype=self._bin_dtype)
         bin_image = bin_image.reshape(self._bin_shape)
 
-        self._input_callback(app=self, frame_from=app_name, frame_num=frame_num, bin_image=bin_image)
+        self._input_callback(
+                app=self, frame_from=app_name, frame_num=frame_num,
+                bin_image=bin_image)
 
     def _input_callback_input_stream(self, msg):
         if not self._input_callback:
@@ -242,9 +233,11 @@ class Application(object):
         self._sent += 1
         if self._out_transition:
             # When (potentially) using transitions, also send the app name.
-            data = [b'%s\x00' % topic, b'%s\x00' % self.name, struct.pack('i', self._sent), result.tobytes()]
+            data = [b'%s\x00' % topic, b'%s\x00' % self.name,
+                    struct.pack('i', self._sent), result.tobytes()]
         else:
-            data = [b'%s\x00' % topic, struct.pack('i', self._sent), result.tobytes()]
+            data = [b'%s\x00' % topic,
+                    struct.pack('i', self._sent), result.tobytes()]
         self._out_socket.send_multipart(data, copy=False)
         return self._sent
 
@@ -306,9 +299,31 @@ class Application(object):
     def _app_heartbeat(self):
         # Update register on redis to indicate that the app is running well.
         self.config['timestamp'] = time.time()
-        self._red.hset(REDIS_KEYS.APPS, self.name, json.dumps(self.config))
+        if self._red.is_connected():
+            self._red.hset(REDIS_KEYS.APPS, self.name, json.dumps(self.config))
+
+    def _setup_redis(self, channels):
+        cfg = {'host': 'localhost', 'port': 6379, 'callback': self._on_redis_connect}
+        if 'redis' in self.config:
+            if 'host' in self.config['redis']:
+                cfg['host'] = self.config['redis']['host']
+            if 'port' in self.config['redis']:
+                cfg['port'] = self.config['redis']['port']
+
+        try:
+            # Keep one redis connection for regular commands.
+            self._red.connect(**cfg)
+            # And another redis connection for pubsub.
+            cb = partial(cfg.pop('callback'), sub_channels=channels)
+            self._red_sub.connect(callback=cb, **cfg)
+        except socket.error as err:
+            if err.errno == errno.ECONNREFUSED:
+                raise IOError("Could not connect to redis at {host}:{port}".format(**cfg))
+            raise
 
     def _on_redis_message(self, msg):
+        if msg is None:
+            return
         msg_type, msg_channel, content = msg
         if msg_type != 'message':
             return
