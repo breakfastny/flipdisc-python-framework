@@ -1,8 +1,8 @@
 import time
 import json
-import errno
 import struct
-import socket
+import logging
+import logging.config
 import collections
 from functools import partial
 
@@ -30,9 +30,10 @@ class Application(object):
 
         * config can be either a string or a dict, if it's a string
           json.load(open(config)) will be used.
+          + "logging" will be passed to logging.config.dictConfig(..)
           + If "output_stream" or "input_stream" keys are present, they
           must specify at least a "width" and "height" subkeys.
-          + If "redis" key is present it will be used to configure the redis
+          + If a "redis" key is present it will be used to configure the redis
           client.
           + The "settings" key must be used for holding settings specific
           to the app that can be updated while it's running.
@@ -56,6 +57,12 @@ class Application(object):
             # Load config from json file.
             config = json.load(open(config))
         self.config = config
+
+        if 'logging' in config:
+            logging.config.dictConfig(config['logging'])
+        else:
+            logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
+        self._log = logging.getLogger(__name__)
 
         # List of redis channels to subscribe.
         sub_channels = []
@@ -109,8 +116,8 @@ class Application(object):
             self._red = None
             self._red_sub = None
         else:
-            self._red = ReconnectingRedis(self.verbose)
-            self._red_sub = ReconnectingRedis(self.verbose, 'pubsub')
+            self._red = ReconnectingRedis()
+            self._red_sub = ReconnectingRedis('pubsub')
             self._setup_redis(sub_channels)
 
     def setup_input(self, cfg='input_stream', topic=INPUT_STREAM, bind=False):
@@ -134,9 +141,9 @@ class Application(object):
         if callback is None:
             raise Exception('Implementation not available for %s configuration' % cfg)
         self._in_stream.on_recv(callback, copy=False)
-        if self.verbose:
-            print("SUB socket %s to %s, topic %s" % (
-                'bound' if bind else 'connected', sock_address, topic))
+
+        self._log.debug("SUB socket %s to %s, topic %s",
+                'bound' if bind else 'connected', sock_address, topic)
 
     def set_input_callback(self, function):
         """
@@ -150,7 +157,8 @@ class Application(object):
             return
 
         if len(msg) != 3:
-            raise TypeError('expected output message of size %d, got %d' % (3, len(msg)))
+            self._log.error('expected output message of size %d, got %d', 3, len(msg))
+            return
 
         # topic = msg[0]  # unused.
         frame_num = struct.unpack('i', msg[1])[0]
@@ -166,7 +174,8 @@ class Application(object):
             return
 
         if len(msg) != 4:
-            raise TypeError('expected transition message of size %d, got %d' % (4, len(msg)))
+            self._log.error('expected transition message of size %d, got %d', 4, len(msg))
+            return
 
         # topic = msg[0]  # unused.
         app_name = str(msg[1])[:-1]
@@ -185,7 +194,8 @@ class Application(object):
             return
 
         if len(msg) != 4:
-            raise TypeError('expected input message of size %d, got %d' % (4, len(msg)))
+            self._log.error('expected input message of size %d, got %d', 4, len(msg))
+            return
 
         # topic = msg[0]  # unused.
         frame_num = struct.unpack('i', msg[1])[0]
@@ -215,8 +225,8 @@ class Application(object):
             self._out_socket.bind(sock_address)
         else:
             self._out_socket.connect(sock_address)
-        if self.verbose:
-            print("PUB socket %s to %s" % ('bound' if bind else 'connected', sock_address))
+        self._log.debug("PUB socket %s to %s",
+                'bound' if bind else 'connected', sock_address)
 
     def send_output(self, result, topic=OUTPUT_STREAM):
         """
@@ -310,16 +320,11 @@ class Application(object):
             if 'port' in self.config['redis']:
                 cfg['port'] = self.config['redis']['port']
 
-        try:
-            # Keep one redis connection for regular commands.
-            self._red.connect(**cfg)
-            # And another redis connection for pubsub.
-            cb = partial(cfg.pop('callback'), sub_channels=channels)
-            self._red_sub.connect(callback=cb, **cfg)
-        except socket.error as err:
-            if err.errno == errno.ECONNREFUSED:
-                raise IOError("Could not connect to redis at {host}:{port}".format(**cfg))
-            raise
+        # Keep one redis connection for regular commands.
+        self._red.connect(**cfg)
+        # And another redis connection for pubsub.
+        cb = partial(cfg.pop('callback'), sub_channels=channels)
+        self._red_sub.connect(callback=cb, **cfg)
 
     def _on_redis_message(self, msg):
         if msg is None:
