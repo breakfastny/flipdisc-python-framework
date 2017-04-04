@@ -61,7 +61,10 @@ class Application(object):
         if 'logging' in config:
             logging.config.dictConfig(config['logging'])
         else:
-            logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
+            logging.basicConfig(
+                    level=logging.DEBUG if verbose else logging.INFO,
+                    format='%(asctime)s %(levelname)s %(name)s %(process)d %(message)s')
+
         self._log = logging.getLogger(__name__)
 
         # List of redis channels to subscribe.
@@ -257,7 +260,7 @@ class Application(object):
             raise Exception("redis not enabled")
         return self._red.publish(channel, json.dumps(data))
 
-    def add_periodic_callback(self, function, float_sec):
+    def add_periodic_callback(self, function, float_sec, start=False):
         """
         Schedule function to be called once each n seconds. The callback
         will receive this instance as its sole argument.
@@ -270,6 +273,8 @@ class Application(object):
                 float_sec * 1000)  # convert to ms
         key = id(cb)
         self._periodic_callbacks[key] = cb
+        if start:
+            cb.start()
         return key
 
     def stop_periodic_callback(self, key):
@@ -290,7 +295,8 @@ class Application(object):
                     self._app_heartbeat, 1000)
             self._cb_app_heartbeat.start()
         for cb in self._periodic_callbacks.values():
-            cb.start()
+            if not cb.is_running():
+                cb.start()
         ioloop.IOLoop.instance().start()
 
     def cleanup(self):
