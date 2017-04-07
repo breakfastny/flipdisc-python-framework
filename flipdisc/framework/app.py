@@ -297,7 +297,7 @@ class Application(object):
         for cb in self._periodic_callbacks.values():
             if not cb.is_running():
                 cb.start()
-        ioloop.IOLoop.instance().start()
+        ioloop.IOLoop.current().start()
 
     def cleanup(self):
         """
