@@ -8,7 +8,7 @@ class OpticalFlow(object):
         self._trackrate = trackrate
         self._max_features = max_features
         self._min_threshold = min_threshold
-        self._reverse = True
+        self._reverse = reverse
 
         self._frame_count = 0
 
