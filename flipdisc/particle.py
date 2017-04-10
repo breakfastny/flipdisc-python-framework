@@ -2,6 +2,21 @@ from flipdisc._particle import lib
 
 __all__ = ["Emitter"]
 
+_PARTICLE_KEYS = {
+    'friction': float,
+    'gravity': float,
+    'gravity_acceleration': float,
+    'gravity_enabled': bool,
+    'restitution': float,
+    'offscreen_delay_max': float,
+    'offscreen_delay_min': float,
+    'spawn_radius_max': float,
+    'spawn_radius_min': float,
+    'speed': float,
+}
+_LIMIT_TO_01 = frozenset(['friction', 'restitution'])
+_LIMIT_TO_0 = frozenset(['gravity'])
+
 
 class Emitter(object):
 
@@ -28,6 +43,27 @@ class Emitter(object):
         pctx = self._ctx.pctx
         pctx.size.x = height
         pctx.size.y = width
+
+    def get_settings(self):
+        pctx = self._ctx.pctx
+        settings = {
+            'size': {'x': pctx.size.x, 'y': pctx.size.y}
+        }
+        for name in _PARTICLE_KEYS:
+            settings[name] = getattr(pctx, name)
+        return settings
+
+    def set_setting(self, name, value):
+        pctx = self._ctx.pctx
+        if name in _PARTICLE_KEYS:
+            value = _PARTICLE_KEYS[name](value)
+            if name in _LIMIT_TO_01 and (value < 0 or value > 1):
+                raise ValueError('"%s" must be between 0 and 1' % name)
+            if name in _LIMIT_TO_0 and value < 0:
+                raise ValueError('"%s" must be greater or equal to 0' % name)
+            setattr(pctx, name, value)
+            return
+        raise KeyError('Unknown setting "%s"' % name)
 
     def clear(self):
         lib.emitter_remove_all(self._ctx)

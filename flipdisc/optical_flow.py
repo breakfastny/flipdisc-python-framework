@@ -4,10 +4,11 @@ import numpy
 
 class OpticalFlow(object):
 
-    def __init__(self, trackrate, max_features, min_threshold):
+    def __init__(self, trackrate, max_features, min_threshold, reverse=True):
         self._trackrate = trackrate
         self._max_features = max_features
         self._min_threshold = min_threshold
+        self._reverse = True
 
         self._frame_count = 0
 
@@ -15,13 +16,16 @@ class OpticalFlow(object):
         self._prev_features = None
         self._features = None
 
-    def update_settings(self, trackrate=None, max_features=None, min_threshold=None):
+    def update_settings(self,
+            trackrate=None, max_features=None, min_threshold=None, reverse=None):
         if trackrate is not None:
             self._trackrate = trackrate
         if max_features is not None:
             self._max_features = max_features
         if min_threshold is not None:
             self._min_threshold = min_threshold
+        if reverse is not None:
+            self._reverse = reverse
 
     def update(self, frame, emitter):
         self._frame_count += 1
@@ -45,7 +49,7 @@ class OpticalFlow(object):
                 continue
             destination = feat[0][::-1]
             origin = self._prev_features[indx][0][::-1]  # XXX is there a guarantee that this indx exists?
-            velocity = origin - destination
+            velocity = origin - destination if self._reverse else destination - origin
             norm = numpy.sqrt((velocity ** 2).sum())
             if norm / height > self._min_threshold:
                 emitter.add_force(tuple(origin), tuple(velocity))
