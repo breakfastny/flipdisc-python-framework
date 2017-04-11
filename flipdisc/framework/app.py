@@ -170,7 +170,11 @@ class Application(object):
         binimage_frame = msg[2]
 
         bin_image = numpy.frombuffer(binimage_frame.bytes, dtype=self._bin_dtype)
-        bin_image = bin_image.reshape(self._bin_shape)
+        try:
+            bin_image = bin_image.reshape(self._bin_shape)
+        except ValueError:
+            self._log.exception('ignoring bad frame')
+            return
 
         self._input_callback(app=self, frame_num=frame_num, bin_image=bin_image)
 
@@ -188,7 +192,11 @@ class Application(object):
         binimage_frame = msg[3]
 
         bin_image = numpy.frombuffer(binimage_frame.bytes, dtype=self._bin_dtype)
-        bin_image = bin_image.reshape(self._bin_shape)
+        try:
+            bin_image = bin_image.reshape(self._bin_shape)
+        except ValueError:
+            self._log.exception('ignoring bad frame')
+            return
 
         self._input_callback(
                 app=self, frame_from=app_name, frame_num=frame_num,
@@ -211,7 +219,11 @@ class Application(object):
         depth = depth.reshape(self._depth_shape)
 
         bgr = numpy.frombuffer(bgr_frame.bytes, dtype=self._bgr_dtype)
-        bgr = bgr.reshape(self._bgr_shape)
+        try:
+            bgr = bgr.reshape(self._bgr_shape)
+        except ValueError:
+            self._log.exception('ignoring bad frame')
+            return
 
         self._input_callback(app=self, frame_num=frame_num, depth=depth, bgr=bgr)
 
@@ -355,6 +367,9 @@ class Application(object):
             self._app_heartbeat()
         elif msg_channel == REDIS_KEYS.SYS_OUTPUT_CHANNEL:
             _update_settings(self.config['output_stream'], data)
+            self._bin_shape = (
+                    self.config['output_stream']['height'],
+                    self.config['output_stream']['width'])
         # XXX handle other kinds of updates.
 
         if self._redis_sub_callback:
