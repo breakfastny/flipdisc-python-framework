@@ -353,7 +353,9 @@ class Application(object):
             # Update app settings.
             _update_settings(self.config['settings'], data)
             self._app_heartbeat()
-        # XXX handle other kinds of updates (e.g. live stream settings).
+        elif msg_channel == REDIS_KEYS.SYS_OUTPUT_CHANNEL:
+            _update_settings(self.config['output_stream'], data)
+        # XXX handle other kinds of updates.
 
         if self._redis_sub_callback:
             self._redis_sub_callback(app=self, channel=msg_channel, update=data)
