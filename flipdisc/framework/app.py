@@ -92,6 +92,7 @@ class Application(object):
             output_height = config['output_stream']['height']
             self._bin_shape = (output_height, output_width)
             self._out_transition = config['output_stream'].get('transition', False)
+            sub_channels.append(REDIS_KEYS.SYS_OUTPUT_CHANNEL)
         else:
             setup_output = False
             self._bin_shape = None
@@ -112,6 +113,7 @@ class Application(object):
         self._cb_app_heartbeat = None
         self._periodic_callbacks = {}
 
+        self._redis_sub_callback = None
         use_redis = True
         if 'redis' in config:
             use_redis = config['redis'].get('enabled', True)
@@ -260,6 +262,13 @@ class Application(object):
             raise Exception("redis not enabled")
         return self._red.publish(channel, json.dumps(data))
 
+    def set_redis_callback(self, function):
+        """
+        Define a callback to be invoked on messages received through
+        the redis pubsub.
+        """
+        self._redis_sub_callback = function
+
     def add_periodic_callback(self, function, float_sec, start=False):
         """
         Schedule function to be called once each n seconds. The callback
@@ -344,8 +353,10 @@ class Application(object):
             # Update app settings.
             _update_settings(self.config['settings'], data)
             self._app_heartbeat()
-
         # XXX handle other kinds of updates (e.g. live stream settings).
+
+        if self._redis_sub_callback:
+            self._redis_sub_callback(app=self, channel=msg_channel, update=data)
 
     def _on_redis_connect(self, sub_channels=None):
         if 'redis' in self.config:

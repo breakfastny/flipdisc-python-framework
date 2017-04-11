@@ -10,7 +10,9 @@ REDIS_KEYS = AttrDict({
     'APP_CHANNEL': 'fd:app:',
 
     # channel name used to send messages to all apps that use input settings.
-    'SYS_INPUT_CHANNEL': 'fd:system:input'
+    'SYS_INPUT_CHANNEL': 'fd:system:input',
+    # channel name used to send messages to all apps that use output settings.
+    'SYS_OUTPUT_CHANNEL': 'fd:system:output',
 })
 
 INPUT_STREAM = "IN_STREAM"
