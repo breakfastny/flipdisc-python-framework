@@ -22,7 +22,7 @@ def run_setup(build_cext):
 
     setup(
         name='flipdisc',
-        version='0.3.1',
+        version='0.3.2',
         packages=["flipdisc", "flipdisc.framework"],
         setup_requires=["cffi>=1.0.0"],
         cffi_modules=["build_particle.py:ffibuilder"],

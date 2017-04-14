@@ -365,12 +365,19 @@ class Application(object):
             # Update app settings.
             _update_settings(self.config['settings'], data)
             self._app_heartbeat()
+        elif msg_channel == REDIS_KEYS.SYS_INPUT_CHANNEL:
+            # Input stream update.
+            _update_settings(self.config['input_stream'], data)
+            input_height = self.config['input_stream']['height']
+            input_width = self.config['input_stream']['width']
+            self._bgr_shape = (input_height, input_width, 3)
+            self._depth_shape = (input_height, input_width)
         elif msg_channel == REDIS_KEYS.SYS_OUTPUT_CHANNEL:
+            # Output stream update.
             _update_settings(self.config['output_stream'], data)
             self._bin_shape = (
                     self.config['output_stream']['height'],
                     self.config['output_stream']['width'])
-        # XXX handle other kinds of updates.
 
         if self._redis_sub_callback:
             self._redis_sub_callback(app=self, channel=msg_channel, update=data)
