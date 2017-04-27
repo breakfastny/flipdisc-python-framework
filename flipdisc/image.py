@@ -20,6 +20,7 @@ def load_image(filename, area_size, binarize=0, padding=0):
 
     # Binarize.
     if binarize is not None:
+        gray[gray <= binarize] = 0
         gray[gray > binarize] = 255
 
     # Copy image to the center of area.
