@@ -69,8 +69,6 @@ class Application(object):
 
         # List of redis channels to subscribe.
         sub_channels = []
-        if self.name:
-            sub_channels.append(REDIS_KEYS.APP_CHANNEL + self.name)
 
         self._input_callback = None
 
@@ -92,19 +90,31 @@ class Application(object):
             output_height = config['output_stream']['height']
             self._bin_shape = (output_height, output_width)
             self._out_transition = config['output_stream'].get('transition', False)
+            self._out_preview = config['output_stream'].get('preview', False)
+            subtopic = config['output_stream'].get('subtopic')
             sub_channels.append(REDIS_KEYS.SYS_OUTPUT_CHANNEL)
         else:
             setup_output = False
+            subtopic = None
             self._bin_shape = None
             self._out_transition = False
+            self._out_preview = False
         self._bin_dtype = 'uint8'
         if self._out_transition and not self.name:
             raise ValueError("App name is required to use transitions")
 
+        if self.name:
+            subtopic = ':%s' % subtopic if subtopic else ''
+            self._app_rkey = self.name + subtopic
+            sub_channels.append(REDIS_KEYS.APP_CHANNEL + self._app_rkey)
+        else:
+            self._app_rkey = None
+
         self._ctx = zmq.Context()
-        self._in_stream = None
+        self._in_stream = {}
         self._sent = 0
         self._out_socket = None
+        self._out_topic = None
         if setup_input:
             self.setup_input()
         if setup_output:
@@ -129,7 +139,7 @@ class Application(object):
         """
         Configure a ZMQ PUB socket for the input stream.
         """
-        if self._in_stream:
+        if cfg in self._in_stream:
             # Already configured the input stream, nothing to do.
             return
 
@@ -140,12 +150,12 @@ class Application(object):
             in_socket.bind(sock_address)
         else:
             in_socket.connect(sock_address)
-        self._in_stream = zmqstream.ZMQStream(in_socket)
+        self._in_stream[cfg] = zmqstream.ZMQStream(in_socket)
 
         callback = getattr(self, '_input_callback_%s' % cfg, None)
         if callback is None:
             raise Exception('Implementation not available for %s configuration' % cfg)
-        self._in_stream.on_recv(callback, copy=False)
+        self._in_stream[cfg].on_recv(callback, copy=False)
 
         self._log.debug("SUB socket %s to %s, topic %s",
                 'bound' if bind else 'connected', sock_address, topic)
@@ -165,7 +175,8 @@ class Application(object):
             self._log.error('expected output message of size %d, got %d', 3, len(msg))
             return
 
-        # topic = msg[0]  # unused.
+        topic = msg[0].bytes
+        subtopic = topic.split(':', 1)[1].rstrip(b'\x00') if ':' in topic else None
         frame_num = struct.unpack('i', msg[1])[0]
         binimage_frame = msg[2]
 
@@ -176,7 +187,12 @@ class Application(object):
             self._log.exception('ignoring bad frame')
             return
 
-        self._input_callback(app=self, frame_num=frame_num, bin_image=bin_image)
+        self._input_callback(
+                app=self, subtopic=subtopic, frame_num=frame_num,
+                bin_image=bin_image)
+
+    # Preview stream is processed the same way as the output stream.
+    _input_callback_preview_stream = _input_callback_output_stream
 
     def _input_callback_input_transition_stream(self, msg):
         if not self._input_callback:
@@ -235,20 +251,24 @@ class Application(object):
             return
 
         sock_address = self.config[cfg]['socket']
+        subtopic = self.config[cfg].get('subtopic')
+        subtopic = ':%s' % subtopic if subtopic else ''
+
         self._out_socket = self._ctx.socket(zmq.PUB)
+        self._out_topic = bytes('%s%s' % (OUTPUT_STREAM, subtopic))
         if bind is None:
-            bind = not self._out_transition
+            bind = (not self._out_transition) and (not self._out_preview)
         if bind:
             self._out_socket.bind(sock_address)
         else:
             self._out_socket.connect(sock_address)
-        self._log.debug("PUB socket %s to %s",
-                'bound' if bind else 'connected', sock_address)
 
-    def send_output(self, result, topic=OUTPUT_STREAM):
+        self._log.debug("PUB socket %s to %s, topic %s",
+                'bound' if bind else 'connected', sock_address, self._out_topic)
+
+    def send_output(self, result, topic=None):
         """
-        Publish result to the specific topic using the output socket
-        configured by setup_output.
+        Publish result using the output socket configured by setup_output.
 
         An integer is returned. This number indicates the number of frames
         sent so far, i.e. the number of send_output invocations, starting
@@ -258,6 +278,7 @@ class Application(object):
             raise Exception("output stream not configured")
 
         self._sent += 1
+        topic = self._out_topic if topic is None else bytes(topic)
         if self._out_transition:
             # When (potentially) using transitions, also send the app name.
             data = [b'%s\x00' % topic, b'%s\x00' % self.name,
@@ -305,6 +326,22 @@ class Application(object):
         cb = self._periodic_callbacks.pop(key)
         cb.stop()
 
+    def call_later(self, float_sec, function, *args, **kwargs):
+        """
+        Schedule function to be called after float_sec seconds have passed.
+
+        The returned handle can be used with cancel_call_later to cancel the
+        future call.
+        """
+        handle = ioloop.IOLoop.current().call_later(float_sec, function, *args, **kwargs)
+        return handle
+
+    def cancel_call_later(self, handle):
+        """
+        Stop a scheduled call_later function from running.
+        """
+        ioloop.IOLoop.current().remove_timeout(handle)
+
     def run(self):
         """
         Start the registered callbacks and the event loop.
@@ -331,13 +368,13 @@ class Application(object):
             self._cb_app_heartbeat.stop()
         if self.name and self._red is not None:
             # Unregister app from redis.
-            self._red.hdel(REDIS_KEYS.APPS, self.name)
+            self._red.hdel(REDIS_KEYS.APPS, self._app_rkey)
 
     def _app_heartbeat(self):
         # Update register on redis to indicate that the app is running well.
         self.config['timestamp'] = time.time()
         if self._red.is_connected():
-            self._red.hset(REDIS_KEYS.APPS, self.name, json.dumps(self.config))
+            self._red.hset(REDIS_KEYS.APPS, self._app_rkey, json.dumps(self.config))
 
     def _setup_redis(self, channels):
         cfg = {'host': 'localhost', 'port': 6379, 'callback': self._on_redis_connect}
