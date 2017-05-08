@@ -2,6 +2,10 @@ from flipdisc._particle import lib
 
 __all__ = ["Emitter"]
 
+_EMITTER_KEYS = {
+    'input_radius': float,
+    'input_amplitude': float,
+}
 _PARTICLE_KEYS = {
     'friction': float,
     'gravity': float,
@@ -54,6 +58,13 @@ class Emitter(object):
         return settings
 
     def set_setting(self, name, value):
+        if name in _EMITTER_KEYS:
+            value = _EMITTER_KEYS[name](value)
+            if value <= 0:
+                raise ValueError('"%s" must be greater than 0')
+            setattr(self._ctx, name, value)
+            return
+
         pctx = self._ctx.pctx
         if name in _PARTICLE_KEYS:
             value = _PARTICLE_KEYS[name](value)
@@ -63,6 +74,7 @@ class Emitter(object):
                 raise ValueError('"%s" must be greater or equal to 0' % name)
             setattr(pctx, name, value)
             return
+
         raise KeyError('Unknown setting "%s"' % name)
 
     def clear(self):
