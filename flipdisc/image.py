@@ -20,8 +20,12 @@ def load_image(filename, area_size, binarize=0, padding=0):
 
     # Binarize.
     if binarize is not None:
-        gray[gray <= binarize] = 0
-        gray[gray > binarize] = 255
+        if binarize >= 0:
+            gray[gray <= binarize] = 0
+            gray[gray > binarize] = 255
+        else:
+            # Use otsu.
+            gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 
     # Copy image to the center of area.
     area = numpy.zeros(area_size, numpy.uint8)
