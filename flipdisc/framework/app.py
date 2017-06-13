@@ -293,6 +293,7 @@ class Application(object):
         """Send json.dumps(data) to a channel using redis pubsub."""
         if not self._red:
             raise Exception("redis not enabled")
+        self._log.debug('Redis outgoing, channel: %s, data: %s', channel, data)
         return self._red.publish(channel, json.dumps(data))
 
     def set_redis_callback(self, function):
@@ -341,6 +342,13 @@ class Application(object):
         Stop a scheduled call_later function from running.
         """
         ioloop.IOLoop.current().remove_timeout(handle)
+
+    def stop_ioloop(self):
+        """
+        Stop the event loop.
+        Note: call the cleanup function after this one if the app is quitting.
+        """
+        ioloop.IOLoop.current().stop()
 
     def run(self):
         """
@@ -397,6 +405,8 @@ class Application(object):
         if msg_type != 'message':
             return
 
+        self._log.debug('Redis incoming, channel: %s, msg: %s', msg_channel, content)
+
         data = json.loads(content)
         if msg_channel.startswith(REDIS_KEYS.APP_CHANNEL):
             # Update app settings.
@@ -417,6 +427,7 @@ class Application(object):
                     self.config['output_stream']['width'])
 
         if self._redis_sub_callback:
+            self._log.debug('Redis sub callback')
             self._redis_sub_callback(app=self, channel=msg_channel, update=data)
 
     def _on_redis_connect(self, sub_channels=None):
