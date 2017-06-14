@@ -10,7 +10,7 @@ ffibuilder.set_source('flipdisc._particle',
         '#include "fdl/particle.h"',
         libraries=['fparticle'])
 
-raw_cdef = open(os.path.join(HERE, '../src/fdl/particle.h')).read()
+raw_cdef = open(os.path.join(HERE, '../flipdisc-core/src/fdl/particle.h')).read()
 # Skip includes and other things. This assumes the first definition
 # in particle.h starts with a struct.
 raw_start = raw_cdef.find('struct ')
