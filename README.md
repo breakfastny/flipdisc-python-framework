@@ -22,6 +22,5 @@ source ~/pyenv/bin/activate
 Install the flipdisc python package:
 
 ```
-pip install numpy
-python setup.py install
+pip install numpy flipdisc
 ```
