@@ -1,6 +1,6 @@
 ## About
 
-The `flipdisc` package provides utilities and a framework for writing flipdisc user apps using Python. The core component is required in order to build the bindings for the particle system.
+The `flipdisc` package provides utilities and a framework for writing flipdisc user apps using Python. The core component is required in order to build the bindings for the particle library.
 
 
 ### Linux Requirements
@@ -17,10 +17,11 @@ source ~/pyenv/bin/activate
 ```
 
 
-## Setup
+## Install
 
 Install the flipdisc python package:
 
 ```
-make
+pip install numpy
+python setup.py install
 ```
