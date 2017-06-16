@@ -23,11 +23,11 @@ def run_setup():
 
     setup(
         name='flipdisc',
-        version='0.4.3',
+        version='0.4.4',
         url='https://github.com/breakfastny/flipdisc-python-framework',
         packages=['flipdisc', 'flipdisc.framework'],
         setup_requires=['cffi>=1.0.0'],
-        cffi_modules=['build_particle.py:ffibuilder'],
+        cffi_modules=['flipdisc/build_particle.py:ffibuilder'],
         install_requires=[
             'cffi>=1.0.0'
             'numpy==1.12.1',
