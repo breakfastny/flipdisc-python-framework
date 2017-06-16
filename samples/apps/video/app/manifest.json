@@ -1,0 +1,38 @@
+{
+    "name": "Video",
+    "name_plural": "Videos",
+    "icons": {
+        "small": "icon/video.svg",
+        "large": "icon/video.svg"
+    },
+    "system": {
+        "name": "video",
+        "entrypoint": "app_movie.py",
+        "execution_profile": "python"
+    },
+    "settings": [
+        {
+            "name": "video",
+            "type": "VideoUUID"
+        },
+        {
+            "name": "play",
+            "type": "boolean",
+            "default": true
+        },
+        {
+            "name": "loop",
+            "type": "boolean",
+            "default": true
+        },
+        {
+            "name": "binarize",
+            "type": "enum",
+            "choices": ["dither", "otsu"],
+            "default": "dither"
+        }
+    ],
+    "instance_image": {
+        "setting": "video"
+    }
+}

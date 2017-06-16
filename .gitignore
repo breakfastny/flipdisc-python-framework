@@ -1,5 +1,6 @@
 build/
 dist/
+samples/**/*.zip
 .eggs/
 *.egg/
 *.egg-info/

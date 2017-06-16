@@ -1,0 +1,208 @@
+{
+    "name": "Image",
+    "name_plural": "Images",
+    "icons": {
+        "small": "icon/image.svg",
+        "large": "icon/image.svg"
+    },
+    "system": {
+        "name": "image",
+        "entrypoint": "user.py",
+        "execution_profile": "python"
+    },
+    "settings": [
+        {
+            "name": "run",
+            "type": "boolean",
+            "default": true
+        },
+        {
+            "name": "interactive",
+            "type": "boolean",
+            "default": true
+        },
+        {
+            "title": "Background image",
+            "name": "background",
+            "settings": [
+                {
+                    "name": "image",
+                    "type": "ImageUUID"
+                },
+                {
+                    "name": "threshold",
+                    "type": "integer",
+                    "default": 128,
+                    "range": [0, 255]
+                }
+            ]
+        },
+        {
+            "title": "Display",
+            "name": "display",
+            "settings": [
+                {
+                    "name": "enabled",
+                    "type": "boolean",
+                    "default": true
+                },
+                {
+                    "name": "threshold",
+                    "type": "integer",
+                    "default": 15,
+                    "range": [0, 255]
+                },
+                {
+                    "name": "flip_mirror",
+                    "type": "boolean",
+                    "default": true
+                },
+                {
+                    "name": "flip_upsidedown",
+                    "type": "boolean",
+                    "default": false
+                },
+                {
+                    "name": "depth_min_threshold",
+                    "type": "integer",
+                    "default": 1000,
+                    "range": [500, 8000]
+                },
+                {
+                    "name": "depth_max_threshold",
+                    "type": "integer",
+                    "default": 2600,
+                    "range": [500, 8000]
+                },
+                {
+                    "name": "trim_upper",
+                    "type": "integer",
+                    "default": 1,
+                    "range": [0, 200]
+                },
+                {
+                    "name": "trim_right",
+                    "type": "integer",
+                    "default": 0,
+                    "range": [0, 200]
+                },
+                {
+                    "name": "trim_bottom",
+                    "type": "integer",
+                    "default": 0,
+                    "range": [0, 200]
+                },
+                {
+                    "name": "trim_left",
+                    "type": "integer",
+                    "default": 2,
+                    "range": [0, 200]
+                }
+            ]
+        },
+        {
+            "title": "Particles",
+            "name": "particles",
+            "settings": [
+                {
+                    "name": "gravity_enabled",
+                    "type": "boolean",
+                    "default": true
+                },
+                {
+                    "name": "gravity",
+                    "type": "number",
+                    "default": 3.0,
+                    "range": [0.0, 100.0]
+                },
+                {
+                    "name": "gravity_acceleration",
+                    "type": "number",
+                    "default": 1.2,
+                    "range": [0.0, 100.0]
+                },
+                {
+                    "name": "friction",
+                    "type": "number",
+                    "default": 0.965,
+                    "range": [0.0, 1.0]
+                },
+                {
+                    "name": "restitution",
+                    "type": "number",
+                    "default": 0.1,
+                    "range": [0.0, 1.0]
+                },
+                {
+                    "name": "speed",
+                    "type": "number",
+                    "default": 8.0,
+                    "range": [0.0, 100.0]
+                },
+                {
+                    "name": "offscreen_delay_max",
+                    "type": "number",
+                    "default": 3.5,
+                    "range": [0.0, 100.0]
+                },
+                {
+                    "name": "offscreen_delay_min",
+                    "type": "number",
+                    "default": 1.2,
+                    "range": [0.0, 100.0]
+                },
+                {
+                    "name": "spawn_radius_max",
+                    "type": "number",
+                    "default": 40.0,
+                    "range": [0.0, 100.0]
+                },
+                {
+                    "name": "spawn_radius_min",
+                    "type": "number",
+                    "default": 5.0,
+                    "range": [0.0, 100.0]
+                },
+                {
+                    "name": "input_radius",
+                    "type": "number",
+                    "default": 2.0,
+                    "range": [0.01, 40.0]
+                },
+                {
+                    "name": "input_amplitude",
+                    "type": "number",
+                    "default": 1.0,
+                    "range": [0.01, 40.0]
+                }
+            ]
+        },
+        {
+            "visible": false,
+            "name": "optical_flow",
+            "settings": [
+                {
+                    "name": "trackrate",
+                    "type": "integer",
+                    "default": 6,
+                    "range": [1, 10]
+                },
+                {
+                    "name": "min_threshold",
+                    "type": "number",
+                    "default": 0.002,
+                    "range": [0.001, 0.005]
+                },
+                {
+                    "name": "max_features",
+                    "type": "integer",
+                    "default": 1000,
+                    "range": [250, 4000]
+                }
+            ]
+        }
+    ],
+    "instance_image": {
+        "setting": "background.image"
+    }
+}

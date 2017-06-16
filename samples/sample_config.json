@@ -1,0 +1,16 @@
+{
+    "output_stream": {
+        "width": 200,
+        "verbose": false,
+        "dimensions_from_panels": true,
+        "height": 100,
+        "socket": "ipc:///tmp/output.ipc"
+    },
+    "input_stream": {
+        "source": "",
+        "width": 320,
+        "verbose": false,
+        "socket": "ipc:///tmp/video.ipc",
+        "height": 240
+    }
+}
