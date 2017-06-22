@@ -2,13 +2,21 @@ import os
 
 from cffi import FFI
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-FDL_PATH = os.getenv('FDL_INCLUDE_DIR', '/usr/local/include/fdl')
-PARTICLE_H = os.path.join(FDL_PATH, 'particle.h')
-if not os.path.exists(FDL_PATH):
-    raise SystemExit('** ERROR: FDL_INCLUDE_DIR "%s" does not exist' % FDL_PATH)
-if not os.path.exists(PARTICLE_H):
-    raise SystemExit('** ERROR: FDL_INCLUDE_DIR does not contain "particle.h"')
+FDL_PATHS = []
+if 'FDL_INCLUDE_DIR' in os.environ:
+    FDL_PATHS.append(os.environ['FDL_INCLUDE_DIR'])
+else:
+    FDL_PATHS.append('/usr/local/include/fdl')
+    FDL_PATHS.append('/usr/include/fdl')
+
+
+def search_particle_h():
+    for p in FDL_PATHS:
+        check = os.path.join(p, 'particle.h')
+        if os.path.exists(p) and os.path.exists(check):
+            return check
+
+    raise SystemExit('** ERROR: particle.h not found at %s' % (','.join(FDL_PATHS)))
 
 
 ffibuilder = FFI()
@@ -16,7 +24,7 @@ ffibuilder.set_source('flipdisc._particle',
         '#include "fdl/particle.h"',
         libraries=['fparticle'])
 
-raw_cdef = open(PARTICLE_H).read()
+raw_cdef = open(search_particle_h()).read()
 # Skip includes and other things. This assumes the first definition
 # in particle.h starts with a struct.
 raw_start = raw_cdef.find('struct ')
