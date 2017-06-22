@@ -232,10 +232,9 @@ class Application(object):
         bgr_frame = msg[3]
 
         depth = numpy.frombuffer(depth_frame.bytes, dtype=self._depth_dtype)
-        depth = depth.reshape(self._depth_shape)
-
         bgr = numpy.frombuffer(bgr_frame.bytes, dtype=self._bgr_dtype)
         try:
+            depth = depth.reshape(self._depth_shape)
             bgr = bgr.reshape(self._bgr_shape)
         except ValueError:
             self._log.exception('ignoring bad frame')
