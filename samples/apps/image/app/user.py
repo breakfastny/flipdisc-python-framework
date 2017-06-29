@@ -1,5 +1,4 @@
 import sys
-import json
 
 import numpy
 import cv2
