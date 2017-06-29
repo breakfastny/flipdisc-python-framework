@@ -1,5 +1,7 @@
-# sudo apt-get install libavdevice-dev libavfilter-dev portaudio19-dev
-# requirements: pip install av pyaudio
+# requirements:
+# linux: sudo apt-get install libavdevice-dev libavfilter-dev portaudio19-dev
+# macos: brew install ffmpeg portaudio
+# python: pip install av pyaudio
 import sys
 import logging
 from functools import partial

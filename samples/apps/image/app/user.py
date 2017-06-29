@@ -45,6 +45,12 @@ def process_frame(app, frame_num, depth, bgr):
 
     # Apply the depth threholds in the color image.
     gray[(depth < depth_min) | (depth > depth_max)] = 0
+    # Crop based on the trim settings.
+    if any((inp_cfg['trim_top'], inp_cfg['trim_right'],
+            inp_cfg['trim_bottom'], inp_cfg['trim_left'])):
+        gray_height, gray_width = gray.shape
+        gray = gray[inp_cfg['trim_top']:gray_height - inp_cfg['trim_bottom'],
+                    inp_cfg['trim_left']:gray_width - inp_cfg['trim_right']]
     # Resize
     gray = cv2.resize(gray, (app.width, app.height), interpolation=cv2.INTER_NEAREST)
     # Binarize.
@@ -84,7 +90,7 @@ def update_app(app):
         else:
             # Load image and convert to binary.
             bg_area = image.load_image(bg_name, (app.height, app.width),
-                    binarize=bg_thresh, padding=32)
+                    binarize=bg_thresh, padding=0)
             if bg_area is not None:
                 # Convert image to particles.
                 util.image_to_particles(app.emitter, bg_area)

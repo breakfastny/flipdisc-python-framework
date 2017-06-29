@@ -49,53 +49,53 @@
                 {
                     "name": "threshold",
                     "type": "integer",
-                    "default": 15,
+                    "default": 39,
                     "range": [0, 255]
                 },
                 {
                     "name": "flip_mirror",
                     "type": "boolean",
-                    "default": true
+                    "default": false
                 },
                 {
                     "name": "flip_upsidedown",
                     "type": "boolean",
-                    "default": false
+                    "default": true
                 },
                 {
                     "name": "depth_min_threshold",
                     "type": "integer",
-                    "default": 1000,
+                    "default": 500,
                     "range": [500, 8000]
                 },
                 {
                     "name": "depth_max_threshold",
                     "type": "integer",
-                    "default": 2600,
+                    "default": 2833,
                     "range": [500, 8000]
                 },
                 {
-                    "name": "trim_upper",
+                    "name": "trim_top",
                     "type": "integer",
-                    "default": 1,
+                    "default": 0,
                     "range": [0, 200]
                 },
                 {
                     "name": "trim_right",
                     "type": "integer",
-                    "default": 0,
+                    "default": 26,
                     "range": [0, 200]
                 },
                 {
                     "name": "trim_bottom",
                     "type": "integer",
-                    "default": 0,
+                    "default": 25,
                     "range": [0, 200]
                 },
                 {
                     "name": "trim_left",
                     "type": "integer",
-                    "default": 2,
+                    "default": 19,
                     "range": [0, 200]
                 }
             ]
@@ -112,7 +112,7 @@
                 {
                     "name": "gravity",
                     "type": "number",
-                    "default": 3.0,
+                    "default": 2.218,
                     "range": [0.0, 100.0]
                 },
                 {
@@ -124,19 +124,19 @@
                 {
                     "name": "friction",
                     "type": "number",
-                    "default": 0.965,
+                    "default": 1,
                     "range": [0.0, 1.0]
                 },
                 {
                     "name": "restitution",
                     "type": "number",
-                    "default": 0.1,
+                    "default": 0.146,
                     "range": [0.0, 1.0]
                 },
                 {
                     "name": "speed",
                     "type": "number",
-                    "default": 8.0,
+                    "default": 1.026,
                     "range": [0.0, 100.0]
                 },
                 {
@@ -154,25 +154,25 @@
                 {
                     "name": "spawn_radius_max",
                     "type": "number",
-                    "default": 40.0,
+                    "default": 86.913,
                     "range": [0.0, 100.0]
                 },
                 {
                     "name": "spawn_radius_min",
                     "type": "number",
-                    "default": 5.0,
+                    "default": 46.836,
                     "range": [0.0, 100.0]
                 },
                 {
                     "name": "input_radius",
                     "type": "number",
-                    "default": 2.0,
+                    "default": 5.389,
                     "range": [0.01, 40.0]
                 },
                 {
                     "name": "input_amplitude",
                     "type": "number",
-                    "default": 1.0,
+                    "default": 7.294,
                     "range": [0.01, 40.0]
                 }
             ]
