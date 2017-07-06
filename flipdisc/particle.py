@@ -90,9 +90,11 @@ class Emitter(object):
         height, width = mat.shape
 
         pctx = self._ctx.pctx
-        for i in xrange(pctx.num_particles):
-            particle = pctx.particles[i]
-            position = particle.position.x, particle.position.y
-            intp = int(round(position[0])), int(round(position[1]))
-            if intp[0] < height and intp[1] < width and intp[0] > 0 and intp[1] > 0:
-                mat[intp] = value
+        positions = lib.particles_in_box(pctx, width, height)
+        i = 0
+        while True:
+            pos = positions[i]
+            i += 1
+            if pos.x < 0:
+                break
+            mat[pos.x, pos.y] = value
