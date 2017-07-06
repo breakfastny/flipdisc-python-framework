@@ -27,7 +27,7 @@ def get_out_shape(app):
 def render(app, img, ts, finished=False):
     if finished:
         app.finished = True
-        app.log('finished video')
+        app.log.info('finished video')
         return
 
     out_shape = get_out_shape(app)
