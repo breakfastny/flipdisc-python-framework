@@ -23,7 +23,7 @@ def run_setup():
 
     setup(
         name='flipdisc',
-        version='0.4.5',
+        version='0.4.6',
         url='https://github.com/breakfastny/flipdisc-python-framework',
         packages=['flipdisc', 'flipdisc.framework'],
         setup_requires=['cffi>=1.0.0'],
