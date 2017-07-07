@@ -1,4 +1,4 @@
-from flipdisc._particle import lib
+from flipdisc._particle import lib, ffi
 
 __all__ = ["Emitter"]
 
@@ -88,13 +88,5 @@ class Emitter(object):
 
     def draw(self, mat, value=255):
         height, width = mat.shape
-
-        pctx = self._ctx.pctx
-        positions = lib.particles_in_box(pctx, width, height)
-        i = 0
-        while True:
-            pos = positions[i]
-            i += 1
-            if pos.x < 0:
-                break
-            mat[pos.x, pos.y] = value
+        arr = ffi.cast('uint8_t*', ffi.from_buffer(mat))
+        lib.particles_draw(self._ctx.pctx, value, arr, width, height)
