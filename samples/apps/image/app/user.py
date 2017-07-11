@@ -135,7 +135,7 @@ def main(cfg_path):
     app.set_redis_callback(channel_update)
     app.add_periodic_callback(update_flow, 1/30.)
     app.add_periodic_callback(update_app, 1/60.)
-    app.add_periodic_callback(draw_and_send, 1/25.)
+    app.add_periodic_callback(draw_and_send, 1/30.)
     try:
         app.run()
     except KeyboardInterrupt:
