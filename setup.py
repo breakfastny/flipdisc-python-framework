@@ -29,7 +29,7 @@ def run_setup():
         setup_requires=['cffi>=1.0.0'],
         cffi_modules=['flipdisc/build_particle.py:ffibuilder'],
         install_requires=[
-            'cffi>=1.0.0'
+            'cffi>=1.0.0',
             'numpy==1.12.1',
             'pyzmq==16.0.2',
             'tornado==4.4.2',
