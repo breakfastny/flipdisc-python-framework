@@ -1,0 +1,101 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "description": "schema for flipdisc user apps - UI and config",
+    "type": "object",
+
+    "required": ["name", "name_plural", "icons", "system", "settings"],
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": "name used by UI"
+        },
+        "name_plural": {
+            "type": "string",
+            "description": "plural name used by UI"
+        },
+        "icons": {
+            "type": "object",
+            "properties": {
+                "small": { "type": "string" },
+                "large": { "type": "string" }
+            },
+            "required": ["large"],
+            "description": "icons used by the UI"
+        },
+        "system": {
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" },
+                "entrypoint": { "type": "string" },
+                "execution_profile": { "type": "string" }
+            },
+            "required": ["name", "entrypoint", "execution_profile"],
+            "description": "parameters used by the backend to run the app"
+        },
+        "settings": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "oneOf": [
+                    { "$ref": "#/definitions/settings_nested_entry" },
+                    { "$ref": "#/definitions/settings_flat_entry" }
+                ]
+            },
+            "description": "settings used by the app"
+        },
+        "instance_image": {
+            "type": "object",
+            "properties": {
+                "setting": { "type": "string" },
+                "file": { "type": "string" }
+            },
+            "oneOf": [
+                {"required": ["setting"]},
+                {"required": ["file"]}
+            ],
+            "description": "static preview used in the UI for app instances"
+        }
+    },
+
+    "definitions": {
+        "settings_nested_entry": {
+            "type": "object",
+            "properties": {
+                "title": { "type": "string" },
+                "editable": { "type": "boolean" },
+                "visible": { "type": "boolean" },
+                "name": {
+                    "type": "string",
+                    "description": "key name in the app configuration"
+                },
+                "settings": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": { "$ref": "#/definitions/settings_flat_entry" }
+                }
+            },
+            "required": ["name", "settings"],
+            "description": "a list of settings"
+        },
+
+        "settings_flat_entry": {
+            "type": "object",
+            "properties": {
+                "label": { "type": "string" },
+                "name": {
+                    "type": "string",
+                    "description": "key name in the app configuration"
+                },
+                "type": { "enum": [
+                    "ImageUUID", "VideoUUID", "AudioUUID",
+                    "boolean", "integer", "number", "string", "enum"
+                ] },
+                "range": { "type": "array", "minItems": 2, "maxItems": 2 },
+                "step": { "type": "number" },
+                "choices": { "type": "array", "minItems": 1 },
+                "default": { "type": ["integer", "boolean", "number", "string"] }
+            },
+            "required": ["name", "type"]
+        }
+    }
+}

@@ -23,9 +23,12 @@ def run_setup():
 
     setup(
         name='flipdisc',
-        version='0.4.7',
+        version='0.4.8',
         url='https://github.com/breakfastny/flipdisc-python-framework',
         packages=['flipdisc', 'flipdisc.framework'],
+        package_data={
+            'flipdisc.framework': ['*.json'],
+        },
         setup_requires=['cffi>=1.0.0'],
         cffi_modules=['flipdisc/build_particle.py:ffibuilder'],
         install_requires=[
@@ -35,6 +38,7 @@ def run_setup():
             'tornado==4.4.2',
             'toredis==0.1.2',
             'attrdict==2.0.0',
+            'jsonschema==2.6.0',
         ],
         zip_safe=False,
         **extra
