@@ -30,6 +30,17 @@
             "type": "enum",
             "choices": ["dither", "otsu"],
             "default": "dither"
+        },
+        {
+            "name": "system",
+            "visible": false,
+            "settings": [
+                {
+                    "name": "audio",
+                    "type": "boolean",
+                    "default": true
+                }
+            ]
         }
     ],
     "instance_image": {

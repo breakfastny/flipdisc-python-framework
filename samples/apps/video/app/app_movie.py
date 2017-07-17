@@ -63,7 +63,9 @@ def update_app(app):
             app.movie.cleanup()
             app.movie = None
         if curr_video:
-            app.movie = Movie(curr_video, desired_size=get_out_shape(app), audio=app.audio)
+            app.movie = Movie(curr_video,
+                    desired_size=get_out_shape(app),
+                    audio=app.audio if app.config['settings']['system']['audio'] else None)
             app.movie.video_callback(partial(render, app))
             app.movie.start()
             if not app.play:
@@ -73,10 +75,13 @@ def update_app(app):
 
 def channel_update(app, channel, update):
     if channel == REDIS_KEYS.APP_CHANNEL + app._app_rkey:
-        if 'fd_cmd' in update and 'shutdown' in update['fd_cmd']:
-            if app.movie:
+        if 'fd_cmd' in update and app.movie:
+            if 'suspend' in update['fd_cmd']:
                 app.suspended = True
                 app.movie.pause()
+            elif 'shutdown' in update['fd_cmd']:
+                app.movie.cleanup()
+                app.movie = None
         elif 'play' in update and update['play']:
             if app.suspended and app.movie:
                 app.movie.resume()
@@ -92,7 +97,8 @@ def main(cfg_path):
     app.play = app.config['settings']['play']
     app.current_video = app.config['settings']['video']
     app.movie = Movie(app.config['settings']['video'],
-            desired_size=get_out_shape(app), audio=app.audio)
+            desired_size=get_out_shape(app),
+            audio=app.audio if app.config['settings']['system']['audio'] else None)
 
     app.movie.video_callback(partial(render, app))
     app.set_redis_callback(channel_update)

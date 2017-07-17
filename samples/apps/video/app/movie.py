@@ -198,7 +198,7 @@ class Movie(object):
         for stream in self._container.streams:
             if stream.type == 'video':
                 self.__init_video(stream)
-            elif stream.type == 'audio':
+            elif stream.type == 'audio' and self._audio is not None:
                 self.__init_audio(stream)
 
     def __init_video(self, stream):
