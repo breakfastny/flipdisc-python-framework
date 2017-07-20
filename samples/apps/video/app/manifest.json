@@ -29,7 +29,7 @@
             "name": "binarize",
             "type": "enum",
             "choices": ["dither", "otsu"],
-            "default": "dither"
+            "default": "otsu"
         },
         {
             "name": "system",
