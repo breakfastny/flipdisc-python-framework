@@ -29,6 +29,7 @@ class MyApp(Application):
 
 def process_frame(app, frame_num, depth, bgr):
     if not app.config['settings']['run']:
+        draw_and_send(app)
         return
 
     # Get current settings
@@ -63,9 +64,12 @@ def process_frame(app, frame_num, depth, bgr):
     user_mask = cv2.resize(user_mask, (app.width, app.height), interpolation=cv2.INTER_NEAREST)
     app.last_user_mask = user_mask
 
+    draw_and_send(app)
+
 
 def update_flow(app):
     if not app.config['settings']['run']:
+        draw_and_send(app)
         return
 
     if app.last_user_mask is not None:
@@ -73,6 +77,11 @@ def update_flow(app):
             app.optflow.update(app.last_user_mask, app.emitter)
 
     app.emitter.update()
+
+    # Render the current particles if the user display is disabled.
+    inp_cfg = app.config['settings']['display']
+    if not inp_cfg['enabled']:
+        draw_and_send(app)
 
 
 def update_app(app):
@@ -135,7 +144,6 @@ def main(cfg_path):
     app.set_redis_callback(channel_update)
     app.add_periodic_callback(update_flow, 1/30.)
     app.add_periodic_callback(update_app, 1/60.)
-    app.add_periodic_callback(draw_and_send, 1/30.)
     try:
         app.run()
     except KeyboardInterrupt:
