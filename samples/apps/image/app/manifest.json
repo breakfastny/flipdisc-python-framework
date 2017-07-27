@@ -124,8 +124,8 @@
                 {
                     "name": "friction",
                     "type": "number",
-                    "default": 1,
-                    "range": [0.0, 1.0]
+                    "default": 0.965,
+                    "range": [0.0, 0.99]
                 },
                 {
                     "name": "restitution",
