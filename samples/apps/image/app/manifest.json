@@ -166,7 +166,7 @@
                 {
                     "name": "input_radius",
                     "type": "number",
-                    "default": 5.389,
+                    "default": 2.389,
                     "range": [0.01, 40.0]
                 },
                 {
