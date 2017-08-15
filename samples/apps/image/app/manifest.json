@@ -34,6 +34,11 @@
                     "type": "integer",
                     "default": 128,
                     "range": [0, 255]
+                },
+                {
+                    "name": "invert",
+                    "type": "boolean",
+                    "default": false
                 }
             ]
         },
@@ -51,6 +56,11 @@
                     "type": "integer",
                     "default": 39,
                     "range": [0, 255]
+                },
+                {
+                    "name": "invert",
+                    "type": "boolean",
+                    "default": false
                 },
                 {
                     "name": "flip_mirror",
