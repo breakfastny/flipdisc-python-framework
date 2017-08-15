@@ -124,14 +124,20 @@ def draw_and_send(app):
         return
 
     # Draw particles.
-    app.emitter.draw(result)
+    bg_invert = app.config['settings']['background']['invert']
+    if not bg_invert:
+        app.emitter.draw(result)
+    else:
+        result.fill(255)
+        app.emitter.draw(result, 0)
 
     # Draw the user.
     if app.last_user is not None and app.last_user_mask is not None:
+        invert_user = app.config['settings']['display']['invert']
         # Erase any points that belong to the user.
-        result[app.last_user_mask != 0] = 0
+        result[app.last_user_mask != 0] = 0 if not invert_user else 255
         # Draw the thresholded user.
-        result[app.last_user != 0] = 255
+        result[app.last_user != 0] = 255 if not invert_user else 0
 
     app.send_output(result)
 
