@@ -64,7 +64,16 @@ def process_frame(app, frame_num, depth, bgr):
     user_mask = cv2.resize(user_mask, (app.width, app.height), interpolation=cv2.INTER_NEAREST)
     app.last_user_mask = user_mask
 
+    update_flow(app)
     draw_and_send(app)
+
+
+def update_flow_30(app):
+    # Render the current particles if the user display is disabled.
+    inp_cfg = app.config['settings']['display']
+    if not inp_cfg['enabled']:
+        update_flow(app)
+        draw_and_send(app)
 
 
 def update_flow(app):
@@ -77,11 +86,6 @@ def update_flow(app):
             app.optflow.update(app.last_user_mask, app.emitter)
 
     app.emitter.update()
-
-    # Render the current particles if the user display is disabled.
-    inp_cfg = app.config['settings']['display']
-    if not inp_cfg['enabled']:
-        draw_and_send(app)
 
 
 def update_app(app):
@@ -145,7 +149,7 @@ def main(cfg_path):
     app = MyApp("image", cfg_path, verbose=True)
     app.set_input_callback(process_frame)
     app.set_redis_callback(channel_update)
-    app.add_periodic_callback(update_flow, 1/30.)
+    app.add_periodic_callback(update_flow_30, 1/30.)
     app.add_periodic_callback(update_app, 1/60.)
     try:
         app.run()
