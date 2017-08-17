@@ -46,11 +46,13 @@ def process_frame(app, frame_num, depth, bgr):
     # Apply the depth threholds in the color image.
     gray[(depth < depth_min) | (depth > depth_max)] = 0
     # Crop based on the trim settings.
+    trimmed = False
     if any((inp_cfg['trim_top'], inp_cfg['trim_right'],
             inp_cfg['trim_bottom'], inp_cfg['trim_left'])):
         gray_height, gray_width = gray.shape
         gray = gray[inp_cfg['trim_top']:gray_height - inp_cfg['trim_bottom'],
                     inp_cfg['trim_left']:gray_width - inp_cfg['trim_right']]
+        trimmed = True
     # Resize
     gray = cv2.resize(gray, (app.width, app.height), interpolation=cv2.INTER_NEAREST)
     # Binarize.
@@ -61,6 +63,10 @@ def process_frame(app, frame_num, depth, bgr):
 
     user_mask = numpy.zeros(depth.shape, gray.dtype)
     user_mask[(depth >= depth_min) & (depth <= depth_max)] = 255
+    if trimmed:
+        m_height, m_width = user_mask.shape
+        user_mask = user_mask[inp_cfg['trim_top']:m_height - inp_cfg['trim_bottom'],
+                              inp_cfg['trim_left']:m_width - inp_cfg['trim_right']]
     user_mask = cv2.resize(user_mask, (app.width, app.height), interpolation=cv2.INTER_NEAREST)
     app.last_user_mask = user_mask
 
