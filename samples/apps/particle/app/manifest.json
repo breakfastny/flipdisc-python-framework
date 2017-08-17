@@ -1,0 +1,79 @@
+{
+    "name": "Particle",
+    "name_plural": "Particles",
+    "icons": {
+        "small": "icon/image.svg",
+        "large": "icon/image.svg"
+    },
+    "system": {
+        "name": "particle",
+        "entrypoint": "particle.py",
+        "execution_profile": "python"
+    },
+    "settings": [
+        {
+            "title": "Background image",
+            "editable": false,
+            "name": "background",
+            "settings": [
+                {
+                    "name": "image",
+                    "type": "ImageUUID"
+                }
+            ]
+        },
+        {
+            "title": "Foreground ball",
+            "name": "ball",
+            "settings": [
+                {
+                    "name": "move",
+                    "type": "boolean",
+                    "default": true
+                },
+                {
+                    "name": "show",
+                    "type": "boolean",
+                    "default": true
+                }
+            ]
+        },
+        {
+            "name": "interactive",
+            "type": "boolean",
+            "default": true
+        },
+        {
+            "name": "run",
+            "type": "boolean",
+            "default": true
+        },
+        {
+            "visible": false,
+            "name": "optical_flow",
+            "settings": [
+                {
+                    "name": "trackrate",
+                    "type": "integer",
+                    "default": 6,
+                    "range": [1, 10]
+                },
+                {
+                    "name": "min_threshold",
+                    "type": "number",
+                    "default": 0.002,
+                    "range": [0.001, 0.005]
+                },
+                {
+                    "name": "max_features",
+                    "type": "integer",
+                    "default": 1000,
+                    "range": [250, 4000]
+                }
+            ]
+        }
+    ],
+    "instance_image": {
+        "setting": "background.image"
+    }
+}
