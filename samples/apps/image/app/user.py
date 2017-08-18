@@ -1,4 +1,5 @@
 import sys
+import logging
 
 import numpy
 import cv2
@@ -54,7 +55,14 @@ def process_frame(app, frame_num, depth, bgr):
                     inp_cfg['trim_left']:gray_width - inp_cfg['trim_right']]
         trimmed = True
     # Resize
-    gray = cv2.resize(gray, (app.width, app.height), interpolation=cv2.INTER_NEAREST)
+    resize_mode = inp_cfg.get('resize_mode')
+    if not hasattr(image, 'resize_%s' % resize_mode):
+        resize_func = image.resize_stretch
+        app.log.warning('resize_mode %s not available, using stretch', resize_mode)
+        inp_cfg['resize'] = 'stretch'
+    else:
+        resize_func = getattr(image, 'resize_%s' % resize_mode)
+    gray = resize_func(gray, (app.width, app.height), interpolation=cv2.INTER_NEAREST)
     # Binarize.
     user_threshold = inp_cfg['threshold']
     gray[gray > user_threshold] = 255
@@ -67,7 +75,7 @@ def process_frame(app, frame_num, depth, bgr):
         m_height, m_width = user_mask.shape
         user_mask = user_mask[inp_cfg['trim_top']:m_height - inp_cfg['trim_bottom'],
                               inp_cfg['trim_left']:m_width - inp_cfg['trim_right']]
-    user_mask = cv2.resize(user_mask, (app.width, app.height), interpolation=cv2.INTER_NEAREST)
+    user_mask = resize_func(user_mask, (app.width, app.height), interpolation=cv2.INTER_NEAREST)
     app.last_user_mask = user_mask
 
     update_flow(app)
@@ -159,6 +167,7 @@ def channel_update(app, channel, update):
 
 def main(cfg_path):
     app = MyApp("image", cfg_path, verbose=True)
+    app.log = logging.getLogger(__name__)
     app.set_input_callback(process_frame)
     app.set_redis_callback(channel_update)
     app.add_periodic_callback(update_flow_30, 1/30.)
