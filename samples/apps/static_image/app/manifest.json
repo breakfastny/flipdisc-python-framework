@@ -1,0 +1,36 @@
+{
+    "name": "Image",
+    "name_plural": "Images",
+    "icons": {
+        "small": "icon/image.svg",
+        "large": "icon/image.svg"
+    },
+    "system": {
+        "name": "static_image",
+        "entrypoint": "main.py",
+        "execution_profile": "python"
+    },
+    "settings": [
+        {
+            "label": "Image",
+            "name": "image",
+            "type": "ImageUUID"
+        },
+        {
+            "label": "Threshold",
+            "name": "threshold",
+            "type": "integer",
+            "default": 128,
+            "range": [0, 255]
+        },
+        {
+            "label": "Invert",
+            "name": "invert",
+            "type": "boolean",
+            "default": false
+        }
+    ],
+    "instance_image": {
+        "setting": "image"
+    }
+}
