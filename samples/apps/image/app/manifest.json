@@ -1,6 +1,6 @@
 {
-    "name": "Image",
-    "name_plural": "Images",
+    "name": "Particle",
+    "name_plural": "Particles",
     "icons": {
         "small": "icon/image.svg",
         "large": "icon/image.svg"

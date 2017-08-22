@@ -1,6 +1,6 @@
 {
-    "name": "Particle",
-    "name_plural": "Particles",
+    "name": "Demo",
+    "name_plural": "Demo",
     "icons": {
         "small": "icon/image.svg",
         "large": "icon/image.svg"
