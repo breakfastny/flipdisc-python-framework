@@ -2,8 +2,8 @@
     "name": "Particle",
     "name_plural": "Particles",
     "icons": {
-        "small": "icon/image.svg",
-        "large": "icon/image.svg"
+        "small": "icon/particles.svg",
+        "large": "icon/particles.svg"
     },
     "system": {
         "name": "image",
