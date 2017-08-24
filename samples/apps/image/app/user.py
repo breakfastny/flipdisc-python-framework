@@ -1,4 +1,5 @@
 import sys
+import time
 import logging
 
 import numpy
@@ -80,12 +81,13 @@ def process_frame(app, frame_num, depth, bgr):
 
     update_flow(app)
     draw_and_send(app)
+    app.last_frame_at = time.time()
 
 
 def update_flow_30(app):
     # Render the current particles if the user display is disabled.
     inp_cfg = app.config['settings']['display']
-    if not inp_cfg['enabled']:
+    if not inp_cfg['enabled'] or time.time() - app.last_frame_at >= 0.3:
         update_flow(app)
         draw_and_send(app)
 
@@ -157,6 +159,8 @@ def draw_and_send(app):
         # Draw the thresholded user.
         result[app.last_user != 0] = 255 if not invert_user else 0
 
+        app.last_user_mask = app.last_user = None
+
     app.send_output(result)
 
 
@@ -170,6 +174,7 @@ def main(cfg_path):
     app.log = logging.getLogger(__name__)
     app.set_input_callback(process_frame)
     app.set_redis_callback(channel_update)
+    app.last_frame_at = time.time()
     app.add_periodic_callback(update_flow_30, 1/30.)
     app.add_periodic_callback(update_app, 1/60.)
     try:
