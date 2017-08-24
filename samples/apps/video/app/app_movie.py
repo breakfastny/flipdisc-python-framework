@@ -18,10 +18,9 @@ from movie import Movie
 
 
 def get_out_shape(app):
-    return (
-        app.config['output_stream']['width'],
-        app.config['output_stream']['height']
-    )
+    width = app.config['output_stream']['width']
+    height = app.config['output_stream']['height']
+    return (width, height)
 
 
 def render(app, img, ts, finished=False):
@@ -40,6 +39,16 @@ def render(app, img, ts, finished=False):
         bin_result = bin_result.astype(numpy.uint8)
     else:
         bin_result = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+
+    trim_cfg = app.config['settings']['trim']
+    if any((trim_cfg['top'], trim_cfg['right'],
+            trim_cfg['bottom'], trim_cfg['left'])):
+        # Trim and then resize it back to the output size.
+        height, width = bin_result.shape
+        bin_result = bin_result[
+                trim_cfg['top']:height - trim_cfg['bottom'],
+                trim_cfg['left']:width - trim_cfg['right']]
+        bin_result = cv2.resize(bin_result, (width, height), interpolation=cv2.INTER_NEAREST)
 
     app.send_output(bin_result)
     # print("diff", time.time() - ts)

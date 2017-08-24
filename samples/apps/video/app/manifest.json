@@ -32,6 +32,35 @@
             "default": "otsu"
         },
         {
+            "name": "trim",
+            "settings": [
+                {
+                    "name": "top",
+                    "type": "integer",
+                    "range": [0, 200],
+                    "default": 0
+                },
+                {
+                    "name": "right",
+                    "type": "integer",
+                    "range": [0, 200],
+                    "default": 0
+                },
+                {
+                    "name": "bottom",
+                    "type": "integer",
+                    "range": [0, 200],
+                    "default": 0
+                },
+                {
+                    "name": "left",
+                    "type": "integer",
+                    "range": [0, 200],
+                    "default": 0
+                }
+            ]
+        },
+        {
             "name": "system",
             "visible": false,
             "settings": [
