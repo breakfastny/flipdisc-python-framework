@@ -59,7 +59,7 @@ def process_frame(app, frame_num, depth, bgr):
     if not hasattr(image, 'resize_%s' % resize_mode):
         resize_func = image.resize_stretch
         app.log.warning('resize_mode %s not available, using stretch', resize_mode)
-        inp_cfg['resize'] = 'stretch'
+        inp_cfg['resize_mode'] = 'stretch'
     else:
         resize_func = getattr(image, 'resize_%s' % resize_mode)
     gray = resize_func(gray, (app.width, app.height), interpolation=cv2.INTER_NEAREST)
