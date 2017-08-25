@@ -2,8 +2,8 @@
     "name": "Demo",
     "name_plural": "Demo",
     "icons": {
-        "small": "icon/image.svg",
-        "large": "icon/image.svg"
+        "small": "icon/demo.svg",
+        "large": "icon/demo.svg"
     },
     "system": {
         "name": "particle",
