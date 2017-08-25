@@ -6,6 +6,7 @@ from multiprocessing import Process, Queue, Event
 from Queue import Empty as QueueEmpty
 
 import av
+import numpy
 import pyaudio
 
 from flipdisc.framework.app import ioloop as app_ioloop
@@ -60,7 +61,7 @@ class Movie(object):
                     self._audio, self._audio_queue, framerate)
 
         args = (self._keep_queueing, self._finished, self._container.name,
-                self._video_queue, self._audio_queue)
+                self._video_queue, self._audio_queue, self.video_info)
         if self._video_stream:
             args += (self._video_stream.index, )
         if self._audio_stream:
@@ -155,7 +156,7 @@ class Movie(object):
         next_at = self._first_video_ts + next_play_at
         self._ioloop.call_at(next_at, self.video_callback, cb)
 
-    def _enqueue(self, run, finished, filepath, vid_q, aud_q, *stindex):
+    def _enqueue(self, run, finished, filepath, vid_q, aud_q, vid_info, *stindex):
         aud_resampler = av.AudioResampler(
             format=av.AudioFormat('s16p').packed,   # WAV PCM signed 16bit planar
             layout='stereo',
@@ -184,8 +185,16 @@ class Movie(object):
                             frame_bgr = frame.to_nd_array(
                                     width=self._vwidth, height=self._vheight,
                                     format='bgr24')
+
                         vid_q.put((prev_video_frame, prev_video_ts, play_at or 0))
-                        prev_video_frame = frame_bgr.copy()
+                        if vid_info['rotate'] == 90:
+                            prev_video_frame = numpy.rot90(frame_bgr.copy(), k=-1)
+                        elif vid_info['rotate'] == 180:
+                            prev_video_frame = numpy.fliplr(numpy.flipud(frame_bgr.copy()))
+                        elif vid_info['rotate'] == 270:
+                            prev_video_frame = numpy.rot90(frame_bgr.copy())
+                        else:
+                            prev_video_frame = frame_bgr.copy()
                         prev_video_ts = play_at or 0
                     else:
                         print 'unknown frame', frame
@@ -209,6 +218,7 @@ class Movie(object):
         self.video_info = {
             'fps': float(stream.average_rate),
             'frame_count': stream.frames,
+            'rotate': int(stream.metadata.get('rotate', '0')),
         }
 
     def __init_audio(self, stream):
