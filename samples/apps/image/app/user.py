@@ -23,6 +23,9 @@ class MyApp(Application):
         self.particles_settings = None
         self.last_user_mask = None
         self.last_user = None
+        filter_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        self.opening = lambda im: cv2.morphologyEx(im, cv2.MORPH_OPEN, filter_kernel)
+        self.closing = lambda im: cv2.morphologyEx(im, cv2.MORPH_CLOSE, filter_kernel)
 
         self.optflow = optical_flow.OpticalFlow(**self.config['settings']['optical_flow'])
         self.emitter = particle.Emitter()
@@ -40,6 +43,20 @@ def process_frame(app, frame_num, depth, bgr):
         return
     depth_min = inp_cfg['depth_min_threshold']
     depth_max = inp_cfg['depth_max_threshold']
+
+    # Filter.
+    if inp_cfg.get('filter_depth'):
+        # Morphological Proper-Opening filter.
+        #depth = numpy.minimum(depth, app.closing(app.opening(app.closing(depth))))
+        # Morphological Proper-Closing filter.
+        #depth = numpy.maximum(depth, app.opening(app.closing(app.opening(depth))))
+        # Morphological Auto-Median filter.
+        #depth = numpy.maximum(
+        #    app.opening(app.closing(app.opening(depth))),
+        #    numpy.minimum(depth, app.closing(app.opening(app.closing(depth))))
+        #)
+        # Simple closing.
+        depth = app.closing(depth)
 
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
     depth = util.flip(depth, inp_cfg['flip_mirror'], inp_cfg['flip_upsidedown'])
