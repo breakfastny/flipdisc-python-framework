@@ -63,7 +63,7 @@ def channel_update(app, channel, update):
 
 
 def main(cfg_path):
-    app = MyApp("static_image", cfg_path, verbose=True)
+    app = MyApp("static_image", cfg_path, setup_input=False, verbose=True)
     app.log = logging.getLogger(__name__)
     app.set_redis_callback(channel_update)
     app.add_periodic_callback(draw_and_send, 1/30.)
