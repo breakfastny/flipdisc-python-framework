@@ -22,7 +22,7 @@
             "default": true
         },
         {
-            "title": "Background image",
+            "title": "Image",
             "name": "background",
             "settings": [
                 {
