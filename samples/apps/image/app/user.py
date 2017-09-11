@@ -187,8 +187,9 @@ def channel_update(app, channel, update):
 
 
 def main(cfg_path):
-    app = MyApp("image", cfg_path, verbose=True)
+    app = MyApp("image", cfg_path, verbose=True, setup_input=False)
     app.log = logging.getLogger(__name__)
+    app.setup_input(watermark=60)
     app.set_input_callback(process_frame)
     app.set_redis_callback(channel_update)
     app.last_frame_at = time.time()
