@@ -44,20 +44,6 @@ def process_frame(app, frame_num, depth, bgr):
     depth_min = inp_cfg['depth_min_threshold']
     depth_max = inp_cfg['depth_max_threshold']
 
-    # Filter.
-    if inp_cfg.get('filter_depth'):
-        # Morphological Proper-Opening filter.
-        #depth = numpy.minimum(depth, app.closing(app.opening(app.closing(depth))))
-        # Morphological Proper-Closing filter.
-        #depth = numpy.maximum(depth, app.opening(app.closing(app.opening(depth))))
-        # Morphological Auto-Median filter.
-        #depth = numpy.maximum(
-        #    app.opening(app.closing(app.opening(depth))),
-        #    numpy.minimum(depth, app.closing(app.opening(app.closing(depth))))
-        #)
-        # Simple closing.
-        depth = app.closing(depth)
-
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
     depth = util.flip(depth, inp_cfg['flip_mirror'], inp_cfg['flip_upsidedown'])
     gray = util.flip(gray, inp_cfg['flip_mirror'], inp_cfg['flip_upsidedown'])
@@ -85,10 +71,17 @@ def process_frame(app, frame_num, depth, bgr):
     user_threshold = inp_cfg['threshold']
     gray[gray > user_threshold] = 255
     gray[gray <= user_threshold] = 0
+    # Clear mask if there are too few active points.
+    clear_threshold = min(depth.shape[0] * depth.shape[1] * 0.02, 128)
+    cleared = False
+    if inp_cfg.get('filter_depth') and numpy.count_nonzero(gray) < clear_threshold:
+        gray.fill(0)
+        cleared = True
     app.last_user = gray.copy()
 
     user_mask = numpy.zeros(depth.shape, gray.dtype)
-    user_mask[(depth >= depth_min) & (depth <= depth_max)] = 255
+    if not cleared:
+        user_mask[(depth >= depth_min) & (depth <= depth_max)] = 255
     if trimmed:
         m_height, m_width = user_mask.shape
         user_mask = user_mask[inp_cfg['trim_top']:m_height - inp_cfg['trim_bottom'],
