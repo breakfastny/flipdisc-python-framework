@@ -72,9 +72,10 @@ def process_frame(app, frame_num, depth, bgr):
     gray[gray > user_threshold] = 255
     gray[gray <= user_threshold] = 0
     # Clear mask if there are too few active points.
-    clear_threshold = min(depth.shape[0] * depth.shape[1] * 0.02, 128)
     cleared = False
-    if inp_cfg.get('filter_depth') and numpy.count_nonzero(gray) < clear_threshold:
+    filter_depth_threshold = inp_cfg.get('filter_threshold', 0)
+    clear_threshold = gray.shape[0] * gray.shape[1] * (filter_depth_threshold / 100.0)
+    if filter_depth_threshold and numpy.count_nonzero(gray) < clear_threshold:
         gray.fill(0)
         cleared = True
     app.last_user = gray.copy()
