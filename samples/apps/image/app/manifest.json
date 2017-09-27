@@ -76,13 +76,13 @@
                     "name": "depth_min_threshold",
                     "type": "integer",
                     "default": 500,
-                    "range": [500, 8000]
+                    "range": [1, 8000]
                 },
                 {
                     "name": "depth_max_threshold",
                     "type": "integer",
                     "default": 2833,
-                    "range": [500, 8000]
+                    "range": [1, 8000]
                 },
                 {
                     "name": "trim_top",
