@@ -135,7 +135,7 @@ class Application(object):
             self._red_sub = ReconnectingRedis('pubsub')
             self._setup_redis(sub_channels)
 
-    def setup_input(self, cfg='input_stream', topic=INPUT_STREAM, bind=False):
+    def setup_input(self, cfg='input_stream', topic=INPUT_STREAM, bind=False, watermark=0):
         """
         Configure a ZMQ PUB socket for the input stream.
         """
@@ -146,6 +146,9 @@ class Application(object):
         sock_address = self.config[cfg]['socket']
         in_socket = self._ctx.socket(zmq.SUB)
         in_socket.setsockopt(zmq.SUBSCRIBE, topic)
+        if watermark > 0:
+            in_socket.set_hwm(watermark)
+
         if bind:
             in_socket.bind(sock_address)
         else:

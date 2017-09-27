@@ -98,7 +98,7 @@ def channel_update(app, channel, update):
 
 
 def main(cfg_path):
-    app = Application("video", cfg_path, verbose=True)
+    app = Application("video", cfg_path, setup_input=False, verbose=True)
     app.log = logging.getLogger(__name__)
     app.audio = pyaudio.PyAudio()
     app.suspended = False

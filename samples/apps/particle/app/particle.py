@@ -95,7 +95,7 @@ def channel_update(app, channel, update):
 
 
 def main(cfg_path):
-    app = MyApp("particle", cfg_path, verbose=True)
+    app = MyApp("particle", cfg_path, setup_input=False, verbose=True)
     app.set_redis_callback(channel_update)
     app.add_periodic_callback(update_flow, 1/30.)
     app.add_periodic_callback(update_app, 1/60.)
