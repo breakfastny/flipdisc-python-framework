@@ -13,6 +13,7 @@ import pyaudio
 from flipdisc.framework.common import REDIS_KEYS
 from flipdisc.framework.app import Application
 from flipdisc.binarize import dither_atkinson
+from flipdisc import image
 
 from movie import Movie
 
@@ -31,7 +32,16 @@ def render(app, img, ts, finished=False):
 
     out_shape = get_out_shape(app)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    gray = cv2.resize(gray, out_shape, interpolation=cv2.INTER_AREA)
+
+    # Resize
+    resize_mode = app.config['settings'].get('resize_mode')
+    if not hasattr(image, 'resize_%s' % resize_mode):
+        resize_func = image.resize_stretch
+        app.log.warning('resize_mode %s not available, using stretch', resize_mode)
+        app.config['settings']['resize_mode'] = 'stretch'
+    else:
+        resize_func = getattr(image, 'resize_%s' % resize_mode)
+    gray = resize_func(gray, out_shape, interpolation=cv2.INTER_AREA)
 
     if app.config['settings']['binarize'] == 'dither':
         bin_result = gray.astype(numpy.float)

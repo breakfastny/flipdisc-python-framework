@@ -32,6 +32,12 @@
             "default": "otsu"
         },
         {
+            "name": "resize_mode",
+            "type": "enum",
+            "choices": ["stretch", "contain", "cover"],
+            "default": "stretch"
+        },
+        {
             "name": "trim",
             "settings": [
                 {
