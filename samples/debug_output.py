@@ -28,7 +28,7 @@ def main():
             setup_input=False, setup_output=False, verbose=True)
     app.config['settings'] = {'scale': 2, 'kron': False}
     app.setup_input('output_stream', OUTPUT_STREAM, bind=False)
-    app.set_input_callback(process_frame)
+    app.set_input_callback(process_frame, 'output_stream')
     try:
         app.run()
     except KeyboardInterrupt:

@@ -11,7 +11,7 @@ import zmq
 from zmq.eventloop import zmqstream, ioloop
 
 from .red import ReconnectingRedis
-from .common import REDIS_KEYS, INPUT_STREAM, OUTPUT_STREAM
+from .common import REDIS_KEYS, INPUT_STREAM, HDMI_INPUT_STREAM, OUTPUT_STREAM
 
 __all__ = ['Application']
 
@@ -20,7 +20,9 @@ ioloop.install()
 
 class Application(object):
 
-    def __init__(self, name, config, setup_input=True, setup_output=True, verbose=False):
+    def __init__(self, name, config,
+            setup_input=True, setup_output=True, setup_hdmi_input=True,
+            verbose=False):
         """
         An user app instance.
 
@@ -31,8 +33,8 @@ class Application(object):
         * config can be either a string or a dict, if it's a string
           json.load(open(config)) will be used.
           + "logging" will be passed to logging.config.dictConfig(..)
-          + If "output_stream" or "input_stream" keys are present, they
-          must specify at least a "width" and "height" subkeys.
+          + If "output_stream", "input_stream" or "hdmi_stream" keys are present,
+          they must specify at least a "width" and "height" subkeys.
           + If a "redis" key is present it will be used to configure the redis
           client.
           + The "settings" key must be used for holding settings specific
@@ -45,7 +47,8 @@ class Application(object):
 
         * if setup_input is True a SUB socket for the input stream will be
           configured for the topic framework.INPUT_STREAM using
-          config["input_stream"]
+          config["input_stream"]. The same applies for setup_hdmi_input
+          with topic frame.HDMI_INPUT_STREAM and config["hdmi_stream"].
 
         * if setup_output is True a PUB socket for the output stream will be
           configured using config["output_stream"]
@@ -70,7 +73,7 @@ class Application(object):
         # List of redis channels to subscribe.
         sub_channels = []
 
-        self._input_callback = None
+        self._input_callback = {}
 
         if 'input_stream' in config:
             input_width = config['input_stream']['width']
@@ -82,8 +85,19 @@ class Application(object):
             setup_input = False
             self._bgr_shape = None
             self._depth_shape = None
+
+        if 'hdmi_stream' in config:
+            hdmi_width = config['hdmi_stream']['width']
+            hdmi_height = config['hdmi_stream']['height']
+            self._hdmi_shape = (hdmi_width, hdmi_height, 3)
+            sub_channels.append(REDIS_KEYS.SYS_HDMI_CHANNEL)
+        else:
+            setup_hdmi_input = False
+            self._hdmi_shape = None
+
         self._bgr_dtype = 'uint8'
         self._depth_dtype = 'uint16'
+        self._hdmi_dtype = 'uint8'
 
         if 'output_stream' in config:
             output_width = config['output_stream']['width']
@@ -117,6 +131,8 @@ class Application(object):
         self._out_topic = None
         if setup_input:
             self.setup_input()
+        if setup_hdmi_input:
+            self.setup_input('hdmi_stream', HDMI_INPUT_STREAM)
         if setup_output:
             self.setup_output()
 
@@ -163,15 +179,16 @@ class Application(object):
         self._log.debug("SUB socket %s to %s, topic %s",
                 'bound' if bind else 'connected', sock_address, topic)
 
-    def set_input_callback(self, function):
+    def set_input_callback(self, function, stream='input_stream'):
         """
         Define a callback to be invoked on messages received through
         the socket configured with setup_input.
         """
-        self._input_callback = function
+        self._input_callback[stream] = function
 
     def _input_callback_output_stream(self, msg):
-        if not self._input_callback:
+        cb = self._input_callback.get('output_stream')
+        if cb is None:
             return
 
         if len(msg) != 3:
@@ -190,15 +207,14 @@ class Application(object):
             self._log.exception('ignoring bad frame')
             return
 
-        self._input_callback(
-                app=self, subtopic=subtopic, frame_num=frame_num,
-                bin_image=bin_image)
+        cb(app=self, subtopic=subtopic, frame_num=frame_num, bin_image=bin_image)
 
     # Preview stream is processed the same way as the output stream.
     _input_callback_preview_stream = _input_callback_output_stream
 
     def _input_callback_input_transition_stream(self, msg):
-        if not self._input_callback:
+        cb = self._input_callback.get('transition_stream')
+        if cb is None:
             return
 
         if len(msg) != 4:
@@ -217,12 +233,11 @@ class Application(object):
             self._log.exception('ignoring bad frame')
             return
 
-        self._input_callback(
-                app=self, frame_from=app_name, frame_num=frame_num,
-                bin_image=bin_image)
+        cb(app=self, frame_from=app_name, frame_num=frame_num, bin_image=bin_image)
 
     def _input_callback_input_stream(self, msg):
-        if not self._input_callback:
+        cb = self._input_callback.get('input_stream')
+        if cb is None:
             return
 
         if len(msg) != 4:
@@ -243,7 +258,28 @@ class Application(object):
             self._log.exception('ignoring bad frame')
             return
 
-        self._input_callback(app=self, frame_num=frame_num, depth=depth, bgr=bgr)
+        cb(app=self, frame_num=frame_num, depth=depth, bgr=bgr)
+
+    def _input_callback_hdmi_stream(self, msg):
+        cb = self._input_callback.get('hdmi_stream')
+        if cb is None:
+            return
+
+        if len(msg) != 3:
+            self._log.error('expected hdmi message of size %d, got %d', 3, len(msg))
+            return
+
+        frame_num = struct.unpack('i', msg[1])[0]
+        bgr_frame = msg[2]
+
+        bgr = numpy.frombuffer(bgr_frame.bytes, dtype=self._hdmi_dtype)
+        try:
+            bgr = bgr.reshape(self._hdmi_shape)
+        except ValueError:
+            self._log.exception('ignoring bad frame')
+            return
+
+        cb(app=self, frame_num=frame_num, bgr=bgr)
 
     def setup_output(self, cfg='output_stream', bind=None):
         """
