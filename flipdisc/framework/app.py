@@ -89,7 +89,7 @@ class Application(object):
         if 'hdmi_stream' in config:
             hdmi_width = config['hdmi_stream']['width']
             hdmi_height = config['hdmi_stream']['height']
-            self._hdmi_shape = (hdmi_width, hdmi_height, 3)
+            self._hdmi_shape = (hdmi_height, hdmi_width, 3)
             sub_channels.append(REDIS_KEYS.SYS_HDMI_CHANNEL)
         else:
             setup_hdmi_input = False
