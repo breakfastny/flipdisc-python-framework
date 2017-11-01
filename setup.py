@@ -10,7 +10,8 @@ else:
     from Cython.Distutils import build_ext as cython_build_ext
     CYTHON_BUILD = cython_build_ext
     binarize_src = 'flipdisc/binarize.pyx'
-binarize_ext = Extension('flipdisc.binarize', [binarize_src])
+binarize_ext = Extension('flipdisc.binarize', [binarize_src],
+        extra_compile_args=['-g0', '-O2'])
 
 
 def run_setup():
@@ -23,7 +24,7 @@ def run_setup():
 
     setup(
         name='flipdisc',
-        version='0.5.0',
+        version='0.5.1',
         url='https://github.com/breakfastny/flipdisc-python-framework',
         packages=['flipdisc', 'flipdisc.framework'],
         package_data={
