@@ -135,7 +135,7 @@
                 {
                     "name": "gravity",
                     "type": "number",
-                    "default": 2.218,
+                    "default": 0.2,
                     "range": [0.0, 100.0]
                 },
                 {
@@ -147,43 +147,43 @@
                 {
                     "name": "friction",
                     "type": "number",
-                    "default": 0.965,
+                    "default": 0.9,
                     "range": [0.0, 0.99]
                 },
                 {
                     "name": "restitution",
                     "type": "number",
-                    "default": 0.146,
+                    "default": 0.15,
                     "range": [0.0, 1.0]
                 },
                 {
                     "name": "speed",
                     "type": "number",
-                    "default": 1.026,
+                    "default": 1,
                     "range": [0.0, 100.0]
                 },
                 {
                     "name": "offscreen_delay_max",
                     "type": "number",
-                    "default": 3.5,
+                    "default": 7,
                     "range": [0.0, 100.0]
                 },
                 {
                     "name": "offscreen_delay_min",
                     "type": "number",
-                    "default": 1.2,
+                    "default": 6,
                     "range": [0.0, 100.0]
                 },
                 {
                     "name": "spawn_radius_max",
                     "type": "number",
-                    "default": 86.913,
+                    "default": 45,
                     "range": [0.0, 100.0]
                 },
                 {
                     "name": "spawn_radius_min",
                     "type": "number",
-                    "default": 46.836,
+                    "default": 25,
                     "range": [0.0, 100.0]
                 },
                 {
@@ -201,7 +201,7 @@
                 {
                     "name": "reverse",
                     "type": "boolean",
-                    "default": true
+                    "default": false
                 }
             ]
         },
