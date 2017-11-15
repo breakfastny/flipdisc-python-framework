@@ -6,6 +6,7 @@ from multiprocessing import Process, Queue, Event
 from Queue import Empty as QueueEmpty
 
 import av
+import av.filter
 import numpy
 import pyaudio
 
@@ -26,8 +27,8 @@ class Movie(object):
         self._audio_player = None
 
         width, height = desired_size
-        self._vwidth = int(math.ceil(width / 16.) * 16)
-        self._vheight = int(math.ceil(height / 16.) * 16)
+        self._vwidth = width
+        self._vheight = height
         self._video_queue = Queue(maxsize=1024)
         self._audio_queue = Queue()
         self._first_video_ts = None
@@ -168,6 +169,25 @@ class Movie(object):
             streams = [container.streams[indx] for indx in stindex]
             prev_video_frame = None
             prev_video_ts = None
+
+            v_stream = container.streams.video[0]
+
+            # Scale down to keep things fast.
+            out_longest_side = max(self._vwidth, self._vheight)
+            if v_stream.height > v_stream.width:
+                scale_args = "w=min(%d,iw):h=-1:flags=area" % (out_longest_side,)
+            else:
+                scale_args = "w=-1:h=min(%d,ih):flags=area" % (out_longest_side,)
+
+            filtergraph = av.filter.Graph()
+            v_src = filtergraph.add_buffer(template=v_stream)
+            v_bgr = filtergraph.add("format", "pix_fmts=bgr24")
+            v_scale = filtergraph.add("scale", scale_args)
+            v_snk = filtergraph.add("buffersink")
+            v_src.link_to(v_bgr)
+            v_bgr.link_to(v_scale)
+            v_scale.link_to(v_snk)
+
             for packet in container.demux(streams):
                 run.wait()
                 for frame in packet.decode():
@@ -177,14 +197,31 @@ class Movie(object):
                         raw_audio = frame_r.planes[0].to_bytes()
                         aud_q.put(raw_audio)
                     elif isinstance(frame, av.VideoFrame):
-                        if frame.width <= 320 and frame.height <= 240:
-                            # Use size as is.
-                            frame_bgr = frame.to_nd_array(format='bgr24')
-                        else:
-                            # Scale down to keep things fast.
-                            frame_bgr = frame.to_nd_array(
-                                    width=self._vwidth, height=self._vheight,
-                                    format='bgr24')
+                        # NOTE: use filtergraph to convert to bgr24 instead of
+                        # frame.reformat(format='bgr24').
+                        #
+                        # For a yuv420p frame, with SIMD optimizations on,
+                        # frame.reformat(format='bgr24') will fail to convert
+                        # the last width%8 pixels on each row, leaving a
+                        # stripe of uninitialized data down the right side.
+                        #
+                        # The problem is VideoFrame allocates buffers with
+                        # align=1 instead of align=SIMD_width_of_cpu.
+                        #
+                        # libavfilter allocates buffers with align=32 so a
+                        # doing the bgr24 conversion via a filtergraph works.
+                        v_src.push(frame)
+                        frame_bgr = v_snk.pull()
+
+                        # frame.to_nd_array() expects buffers to be align=1 so
+                        # we have to do this by hand
+                        plane = frame_bgr.planes[0]
+                        dtype = numpy.uint8
+                        bytes_per_pixel = 3
+                        frame_h, frame_w = frame_bgr.height, frame_bgr.width
+                        buffer_w = plane.line_size / bytes_per_pixel
+                        frame_bgr = numpy.frombuffer(plane, dtype).reshape(
+                                frame_h, buffer_w, -1)[:frame_h,:frame_w]
 
                         vid_q.put((prev_video_frame, prev_video_ts, play_at or 0))
                         if vid_info['rotate'] == 90:
