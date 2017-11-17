@@ -39,6 +39,18 @@
                     "name": "invert",
                     "type": "boolean",
                     "default": false
+                },
+                {
+                    "name": "resize_mode",
+                    "type": "enum",
+                    "choices": ["stretch", "contain", "cover", "factor"],
+                    "default": "stretch"
+                },
+                {
+                    "name": "resize_factor",
+                    "type": "number",
+                    "default": 1,
+                    "range": [0.01, 100.0]
                 }
             ]
         },

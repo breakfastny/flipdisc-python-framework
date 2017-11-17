@@ -5,7 +5,7 @@ from flipdisc import util
 
 __all__ = [
     'INTER_NEAREST', 'INTER_LINEAR', 'INTER_AREA', 'INTER_CUBIC', 'INTER_LANCZOS4',
-    'resize_stretch', 'resize_cover', 'resize_contain', 'load_image',
+    'resize_stretch', 'resize_cover', 'resize_contain', 'resize_factor', 'load_image',
 ]
 
 
@@ -76,6 +76,53 @@ def resize_contain(im, out_size, bgcolor=0, interpolation=INTER_NEAREST):
         out1[extra_height/2:-(extra_height/2 + one_more), :] = out
         out = out1
 
+    return out
+
+
+def resize_factor(im, out, fx, fy, interpolation=None):
+    """
+    * im: numpy array
+    * out: numpy array
+    * fx: float x-axis scale factor
+    * fy: float y-axis scale factor
+    * interpolation: interpolation method to use
+
+    Resize image and paste the result over the center of out; edges are
+    cropped if necessary.
+    """
+    assert fx > 0, 'fx must be positive'
+    assert fy > 0, 'fy must be positive'
+
+    if interpolation is None:
+        if fx < 1 or fy < 1:
+            interpolation = cv2.INTER_AREA
+        else:
+            interpolation = cv2.INTER_NEAREST
+
+    scaled_size = (int(fy*im.shape[1]), int(fx*im.shape[0]))
+    scaled = cv2.resize(im, scaled_size, interpolation=interpolation)
+    ih, iw = scaled.shape[:2]
+    oh, ow = out.shape[:2]
+
+    x = y = ix = iy = 0
+    x2, y2 = x+ow, y+oh
+    ix2, iy2 = ix+iw, iy+ih
+
+    if iw < ow:
+        x = (ow - iw) / 2
+        x2 = x + iw
+    elif iw > ow:
+        ix = (iw - ow) / 2
+        ix2 = ix + ow
+
+    if ih < oh:
+        y = (oh - ih) / 2
+        y2 = y + ih
+    elif ih > oh:
+        iy = (ih - oh) / 2
+        iy2 = iy + oh
+
+    out[y:y2,x:x2] = scaled[iy:iy2,ix:ix2]
     return out
 
 

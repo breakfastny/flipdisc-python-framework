@@ -2,6 +2,7 @@ import sys
 import logging
 
 import numpy
+import cv2
 
 from flipdisc import particle, util, image
 from flipdisc.framework.app import Application
@@ -27,19 +28,43 @@ def update_app(app):
     bg_cfg = app.config['settings']
     bg_name = bg_cfg['image']
     bg_thresh = bg_cfg['threshold']
-    if app.current_bg != (bg_name, bg_thresh):
+    bg_resize_mode = bg_cfg.get('resize_mode', 'stretch')
+    bg_resize_factor = bg_cfg.get('resize_factor', 1)
+
+    if app.current_bg != (bg_name, bg_thresh, bg_resize_mode, bg_resize_factor):
         if not bg_name:
             # Clear particles.
             app.emitter.clear()
         else:
             # Load image and convert to binary.
-            bg_area = image.load_image(bg_name, (app.height, app.width),
-                    binarize=bg_thresh, padding=0)
+            bg_area = numpy.zeros((app.height, app.width), dtype=numpy.uint8)
+
+            gray = cv2.imread(bg_name, cv2.IMREAD_GRAYSCALE)
+            if not hasattr(image, 'resize_%s' % bg_resize_mode):
+                resize_func = image.resize_stretch
+                app.log.warning('resize_mode %s not available, using stretch', bg_resize_mode)
+                bg_cfg['resize_mode'] = 'stretch'
+            else:
+                resize_func = getattr(image, 'resize_%s' % bg_resize_mode)
+
+            resize_args = (gray, (app.width, app.height),)
+            if bg_resize_mode == 'factor':
+                gray = resize_func(gray, bg_area, bg_resize_factor, bg_resize_factor)
+            else:
+                gray = resize_func(gray, (app.width, app.height),
+                        interpolation=cv2.INTER_AREA)
+
+            if bg_thresh >= 0:
+                bg_area[gray <= bg_thresh] = 0
+                bg_area[gray > bg_thresh] = 255
+            else:
+                bg_area = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+
             if bg_area is not None:
                 # Convert image to particles.
                 util.image_to_particles(app.emitter, bg_area)
 
-        app.current_bg = (bg_name, bg_thresh)
+        app.current_bg = (bg_name, bg_thresh, bg_resize_mode, bg_resize_factor)
 
 
 def draw_and_send(app):

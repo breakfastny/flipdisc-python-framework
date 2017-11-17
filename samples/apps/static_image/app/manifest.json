@@ -28,6 +28,20 @@
             "name": "invert",
             "type": "boolean",
             "default": false
+        },
+        {
+            "label": "Resize Mode",
+            "name": "resize_mode",
+            "type": "enum",
+            "choices": ["stretch", "contain", "cover", "factor"],
+            "default": "stretch"
+        },
+        {
+            "label": "Resize Factor",
+            "name": "resize_factor",
+            "type": "number",
+            "default": 1,
+            "range": [0.01, 100.0]
         }
     ],
     "instance_image": {
