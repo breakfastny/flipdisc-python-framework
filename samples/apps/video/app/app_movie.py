@@ -60,6 +60,9 @@ def render(app, img, ts, finished=False):
                 trim_cfg['left']:width - trim_cfg['right']]
         bin_result = cv2.resize(bin_result, (width, height), interpolation=cv2.INTER_NEAREST)
 
+    if app.config['settings'].get('invert', False):
+        bin_result = ~bin_result
+
     app.send_output(bin_result)
     # print("diff", time.time() - ts)
 
