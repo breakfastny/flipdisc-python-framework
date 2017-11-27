@@ -120,12 +120,14 @@ def update_app(app):
         return
 
     bg_cfg = app.config['settings']['background']
+    bg_invert = bg_cfg['invert']
+    bg_invert_particles = bg_cfg.get('invert_particles', False)
     bg_name = bg_cfg['image']
     bg_thresh = bg_cfg['threshold']
     bg_resize_mode = bg_cfg.get('resize_mode', 'stretch')
     bg_resize_factor = float(bg_cfg.get('resize_factor', 1))
 
-    if app.current_bg != (bg_name, bg_thresh, bg_resize_mode, bg_resize_factor):
+    if app.current_bg != (bg_invert, bg_invert_particles, bg_name, bg_thresh, bg_resize_mode, bg_resize_factor):
         if not bg_name:
             # Clear particles.
             app.emitter.clear()
@@ -153,11 +155,17 @@ def update_app(app):
             else:
                 bg_area = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 
+            if bg_invert_particles:
+                bg_area = ~bg_area
+
+            if bg_invert:
+                bg_area = ~bg_area
+
             if bg_area is not None:
                 # Convert image to particles.
                 util.image_to_particles(app.emitter, bg_area)
 
-        app.current_bg = (bg_name, bg_thresh, bg_resize_mode, bg_resize_factor)
+        app.current_bg = (bg_invert, bg_invert_particles, bg_name, bg_thresh, bg_resize_mode, bg_resize_factor)
 
     curr_particles = app.config['settings']['particles']
     if curr_particles == app.particles_settings:
@@ -178,8 +186,8 @@ def draw_and_send(app):
         return
 
     # Draw particles.
-    bg_invert = app.config['settings']['background']['invert']
-    if not bg_invert:
+    bg_invert_particles = app.config['settings']['background']['invert_particles']
+    if not bg_invert_particles:
         app.emitter.draw(result)
     else:
         result.fill(255)

@@ -41,6 +41,11 @@
                     "default": false
                 },
                 {
+                    "name": "invert_particles",
+                    "type": "boolean",
+                    "default": false
+                },
+                {
                     "name": "resize_mode",
                     "type": "enum",
                     "choices": ["stretch", "contain", "cover", "factor"],
