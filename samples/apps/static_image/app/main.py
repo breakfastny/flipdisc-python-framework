@@ -47,9 +47,12 @@ def update_app(app):
             else:
                 resize_func = getattr(image, 'resize_%s' % bg_resize_mode)
 
-            resize_args = (gray, (app.width, app.height),)
-            if bg_resize_mode == 'factor':
-                gray = resize_func(gray, bg_area, bg_resize_factor, bg_resize_factor)
+            if resize_func == getattr(image, 'resize_factor', None):
+                contain_h = float(app.height) / gray.shape[0]
+                contain_w = float(app.width)  / gray.shape[1]
+                contain_scale = min(contain_h, contain_w)
+                resize_factor = contain_scale * bg_resize_factor
+                gray = resize_func(gray, bg_area, resize_factor, resize_factor)
             else:
                 gray = resize_func(gray, (app.width, app.height),
                         interpolation=cv2.INTER_AREA)
