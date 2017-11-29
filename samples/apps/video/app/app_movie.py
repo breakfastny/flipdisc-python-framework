@@ -77,7 +77,8 @@ def update_app(app):
                 app.movie.resume()
 
     curr_video = app.config['settings']['video']
-    if app.current_video != curr_video or (app.finished and app.config['settings']['loop']):
+    curr_hash = _get_playlist_item_hash(app)
+    if app.current_hash != curr_hash or (app.finished and app.config['settings']['loop']):
         # New video file.
         app.log.info('switching from %s to %s', app.current_video, curr_video)
         app.finished = False
@@ -93,6 +94,7 @@ def update_app(app):
             if not app.play:
                 app.movie.pause()
         app.current_video = curr_video
+        app.current_hash = curr_hash
 
 
 def channel_update(app, channel, update):
@@ -110,6 +112,16 @@ def channel_update(app, channel, update):
                 app.suspended = False
 
 
+def _get_playlist_item_hash(app):
+    system = app.config['settings'].get('system', {})
+    playlist_item = system.get('playlist_item', {})
+    instance_id = playlist_item.get('appinstance_id')
+    playlist_item_id = playlist_item.get('id')
+    playlist_item_started_at = playlist_item.get('started_at')
+    video = app.config['settings']['video']
+    return instance_id, playlist_item_id, playlist_item_started_at, video
+
+
 def main(cfg_path):
     app = Application("video", cfg_path, setup_input=False, verbose=True)
     app.log = logging.getLogger(__name__)
@@ -118,6 +130,7 @@ def main(cfg_path):
     app.finished = False
     app.play = app.config['settings']['play']
     app.current_video = app.config['settings']['video']
+    app.current_hash = _get_playlist_item_hash(app)
     app.movie = Movie(app.config['settings']['video'],
             desired_size=get_out_shape(app),
             audio=app.audio if app.config['settings']['system']['audio'] else None)
