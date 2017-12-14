@@ -57,6 +57,9 @@ def resize_contain(im, out_size, bgcolor=0, interpolation=INTER_NEAREST):
         out_width = out_size[0]
         out_height = int(out_size[0] / im_ratio)
 
+    if 0 in (out_width, out_height):
+        return numpy.zeros((out_size[1], out_size[0]), im.dtype)
+
     out = cv2.resize(im, (out_width, out_height), interpolation=interpolation)
     # If the output is too small, center it based on the specified size.
     if out.shape[1] < out_size[0]:
@@ -100,6 +103,9 @@ def resize_factor(im, out, fx, fy, interpolation=None):
             interpolation = cv2.INTER_NEAREST
 
     scaled_size = (int(fy*im.shape[1]), int(fx*im.shape[0]))
+    if 0 in scaled_size:
+        return out
+
     scaled = cv2.resize(im, scaled_size, interpolation=interpolation)
     ih, iw = scaled.shape[:2]
     oh, ow = out.shape[:2]
