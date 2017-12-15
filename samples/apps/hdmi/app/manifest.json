@@ -1,0 +1,119 @@
+{
+  "name": "HDMI",
+  "name_plural": "HDMI",
+  "icons": {
+    "small": "icon/image.svg",
+    "large": "icon/image.svg"
+  },
+  "system": {
+    "name": "hdmi",
+    "entrypoint": "app.py",
+    "execution_profile": "python"
+  },
+  "settings": [
+    {
+      "label": "Mean Blocksize",
+      "name": "mean_blocksize",
+      "type": "integer",
+      "range": [3, 255],
+      "step": 2,
+      "default": 3
+    },
+    {
+      "label": "Mean Constant",
+      "name": "mean_constant",
+      "type": "integer",
+      "range": [-255, 255],
+      "default": 1
+    },
+    {
+      "label": "Gaussian Blocksize",
+      "name": "gaussian_blocksize",
+      "type": "integer",
+      "range": [3, 255],
+      "step": 2,
+      "default": 3
+    },
+    {
+      "label": "Gaussian Constant",
+      "name": "gaussian_constant",
+      "type": "integer",
+      "range": [-255, 255],
+      "default": 1
+    },
+    {
+      "label": "Threshold",
+      "name": "threshold",
+      "type": "integer",
+      "range": [0, 255],
+      "default": 127
+    },
+    {
+      "label": "Invert",
+      "name": "invert",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "label": "Binarize",
+      "name": "binarize",
+      "type": "enum",
+      "choices": ["otsu", "dither", "gaussian", "mean", "threshold"],
+      "default": "otsu"
+    },
+    {
+      "label": "Resize Mode",
+      "name": "resize_mode",
+      "type": "enum",
+      "choices": ["stretch", "contain", "cover", "factor"],
+      "default": "contain"
+    },
+    {
+      "label": "Resize Factor",
+      "name": "resize_factor",
+      "type": "number",
+      "default": 1,
+      "range": [0.1, 10.0],
+      "step": 0.1
+    },
+    {
+      "label": "Crop X",
+      "name": "crop_x",
+      "type": "integer",
+      "default": 0,
+      "range": [0, 2047]
+    },
+    {
+      "label": "Crop Y",
+      "name": "crop_y",
+      "type": "integer",
+      "default": 0,
+      "range": [0, 1199]
+    },
+    {
+      "label": "Crop Width",
+      "name": "crop_width",
+      "type": "integer",
+      "default": 0,
+      "range": [0, 2048]
+    },
+    {
+      "label": "Crop Height",
+      "name": "crop_height",
+      "type": "integer",
+      "default": 0,
+      "range": [0, 1200]
+    },
+    {
+      "name": "system",
+      "visible": false,
+      "settings": [
+        {
+          "name": "audio",
+          "type": "boolean",
+          "default": true
+        }
+      ]
+    }
+  ]
+}
