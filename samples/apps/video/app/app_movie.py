@@ -47,6 +47,11 @@ def render(app, img, ts, finished=False):
         bin_result = gray.astype(numpy.float)
         dither_atkinson(bin_result)
         bin_result = bin_result.astype(numpy.uint8)
+    elif app.config['settings']['binarize'] == 'adaptive':
+        gray = cv2.bilateralFilter(gray, 7, 11, 11)
+        blocksize = 3
+        bin_result = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY, blocksize, -1)
     else:
         bin_result = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 

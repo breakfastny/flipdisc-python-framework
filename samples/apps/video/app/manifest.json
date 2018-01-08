@@ -28,7 +28,7 @@
         {
             "name": "binarize",
             "type": "enum",
-            "choices": ["dither", "otsu"],
+            "choices": ["dither", "otsu", "adaptive"],
             "default": "otsu"
         },
         {
