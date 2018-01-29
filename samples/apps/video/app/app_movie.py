@@ -52,6 +52,11 @@ def render(app, img, ts, finished=False):
         blocksize = 3
         bin_result = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                 cv2.THRESH_BINARY, blocksize, -1)
+    elif app.config['settings']['binarize'] == 'threshold':
+        thres = app.config['settings']['threshold']
+        gray[gray > thres] = 255
+        gray[gray <= thres] = 0
+        bin_result = gray
     else:
         bin_result = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 

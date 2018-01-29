@@ -28,8 +28,14 @@
         {
             "name": "binarize",
             "type": "enum",
-            "choices": ["dither", "otsu", "adaptive"],
+            "choices": ["dither", "otsu", "adaptive", "threshold"],
             "default": "otsu"
+        },
+        {
+            "name": "threshold",
+            "type": "integer",
+            "default": 128,
+            "range": [0, 255]
         },
         {
             "name": "invert",
