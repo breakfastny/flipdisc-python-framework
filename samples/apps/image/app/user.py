@@ -234,6 +234,8 @@ def main(cfg_path):
     app.last_frame_at = time.time()
     app.add_periodic_callback(update_flow_30, 1/30.)
     app.add_periodic_callback(update_app, 1/60.)
+    # Ensure the initial frame contains the logo.
+    update_app(app)
     try:
         app.run()
     except KeyboardInterrupt:
