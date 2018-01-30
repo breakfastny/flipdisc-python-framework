@@ -115,6 +115,15 @@ def update_flow(app):
     app.emitter.update()
 
 
+def _image_to_particles(emitter, im, transition=True):
+    pctx = emitter._ctx.pctx
+    prev_max, prev_min = pctx.spawn_radius_max, pctx.spawn_radius_min
+    if not transition:
+        pctx.spawn_radius_max, pctx.spawn_radius_min = 0, 0
+    util.image_to_particles(emitter, im)
+    pctx.spawn_radius_max, pctx.spawn_radius_min = prev_max, prev_min
+
+
 def update_app(app):
     if not app.config['settings']['run']:
         return
@@ -126,6 +135,7 @@ def update_app(app):
     bg_thresh = bg_cfg['threshold']
     bg_resize_mode = bg_cfg.get('resize_mode', 'stretch')
     bg_resize_factor = float(bg_cfg.get('resize_factor', 1))
+    bg_transition = app.config['settings']['background'].get('transition', True)
 
     if app.current_bg != (bg_invert, bg_invert_particles, bg_name, bg_thresh, bg_resize_mode, bg_resize_factor):
         if not bg_name:
@@ -167,7 +177,7 @@ def update_app(app):
 
             if bg_area is not None:
                 # Convert image to particles.
-                util.image_to_particles(app.emitter, bg_area)
+                _image_to_particles(app.emitter, bg_area, transition=bg_transition)
 
         app.current_bg = (bg_invert, bg_invert_particles, bg_name, bg_thresh, bg_resize_mode, bg_resize_factor)
 

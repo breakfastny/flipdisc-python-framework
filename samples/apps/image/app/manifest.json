@@ -36,6 +36,11 @@
                     "range": [0, 255]
                 },
                 {
+                    "name": "transition",
+                    "type": "boolean",
+                    "default": true
+                },
+                {
                     "name": "invert",
                     "type": "boolean",
                     "default": false
