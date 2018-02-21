@@ -1,119 +1,117 @@
 {
-  "name": "HDMI",
-  "name_plural": "HDMI",
+  "system": {
+    "entrypoint": "app.py",
+    "name": "hdmi",
+    "execution_profile": "python"
+  },
   "icons": {
     "small": "icon/image.svg",
     "large": "icon/image.svg"
   },
-  "system": {
-    "name": "hdmi",
-    "entrypoint": "app.py",
-    "execution_profile": "python"
-  },
+  "name": "HDMI",
   "settings": [
     {
-      "label": "Mean Blocksize",
-      "name": "mean_blocksize",
-      "type": "integer",
-      "range": [3, 255],
-      "step": 2,
-      "default": 3
-    },
-    {
-      "label": "Mean Constant",
-      "name": "mean_constant",
-      "type": "integer",
-      "range": [-255, 255],
-      "default": 1
-    },
-    {
-      "label": "Gaussian Blocksize",
-      "name": "gaussian_blocksize",
-      "type": "integer",
-      "range": [3, 255],
-      "step": 2,
-      "default": 3
-    },
-    {
-      "label": "Gaussian Constant",
-      "name": "gaussian_constant",
-      "type": "integer",
-      "range": [-255, 255],
-      "default": 1
-    },
-    {
-      "label": "Threshold",
-      "name": "threshold",
-      "type": "integer",
-      "range": [0, 255],
-      "default": 127
-    },
-    {
-      "label": "Invert",
-      "name": "invert",
-      "type": "boolean",
-      "default": true
-    },
-    {
-      "label": "Binarize",
+      "default": "otsu",
+      "choices": [
+        "dither",
+        "otsu",
+        "adaptive",
+        "threshold"
+      ],
+      "type": "enum",
       "name": "binarize",
-      "type": "enum",
-      "choices": ["otsu", "dither", "gaussian", "mean", "threshold"],
-      "default": "otsu"
+      "label": "Binarize"
     },
     {
-      "label": "Resize Mode",
+      "default": 128,
+      "range": [
+        0,
+        255
+      ],
+      "type": "integer",
+      "name": "threshold",
+      "label": "Threshold"
+    },
+    {
+      "default": true,
+      "type": "boolean",
+      "name": "invert",
+      "label": "Invert"
+    },
+    {
+      "default": "contain",
+      "choices": [
+        "stretch",
+        "contain",
+        "cover",
+        "factor"
+      ],
+      "type": "enum",
       "name": "resize_mode",
-      "type": "enum",
-      "choices": ["stretch", "contain", "cover", "factor"],
-      "default": "contain"
+      "label": "Resize Mode"
     },
     {
-      "label": "Resize Factor",
       "name": "resize_factor",
-      "type": "number",
       "default": 1,
-      "range": [0.1, 10.0],
-      "step": 0.1
+      "step": 0.1,
+      "label": "Resize Factor",
+      "range": [
+        0.1,
+        10
+      ],
+      "type": "number"
     },
     {
-      "label": "Crop X",
+      "default": 0,
+      "range": [
+        0,
+        2047
+      ],
+      "type": "integer",
       "name": "crop_x",
-      "type": "integer",
-      "default": 0,
-      "range": [0, 2047]
+      "label": "Crop X"
     },
     {
-      "label": "Crop Y",
+      "default": 0,
+      "range": [
+        0,
+        1199
+      ],
+      "type": "integer",
       "name": "crop_y",
-      "type": "integer",
-      "default": 0,
-      "range": [0, 1199]
+      "label": "Crop Y"
     },
     {
-      "label": "Crop Width",
+      "default": 0,
+      "range": [
+        0,
+        2048
+      ],
+      "type": "integer",
       "name": "crop_width",
-      "type": "integer",
-      "default": 0,
-      "range": [0, 2048]
+      "label": "Crop Width"
     },
     {
-      "label": "Crop Height",
+      "default": 0,
+      "range": [
+        0,
+        1200
+      ],
+      "type": "integer",
       "name": "crop_height",
-      "type": "integer",
-      "default": 0,
-      "range": [0, 1200]
+      "label": "Crop Height"
     },
     {
-      "name": "system",
       "visible": false,
+      "name": "system",
       "settings": [
         {
-          "name": "audio",
+          "default": true,
           "type": "boolean",
-          "default": true
+          "name": "audio"
         }
       ]
     }
-  ]
+  ],
+  "name_plural": "HDMI"
 }

@@ -68,38 +68,28 @@ def process_frame(app, frame_num, bgr):
     # Binarize
     bin_method = app.config['settings']['binarize']
 
-    # ensure blocksize is odd and greater than or equal to 3
-    rnd_blocksize = lambda n: max(3, n + ((n%2)-1))
-
-    if bin_method == 'mean':
-        blocksize = rnd_blocksize(app.config['settings']['mean_blocksize'])
-        constant = app.config['settings']['mean_constant']
-        gray = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
-                cv2.THRESH_BINARY, blocksize, constant)
-
-    elif bin_method == 'gaussian':
-        blocksize = rnd_blocksize(app.config['settings']['gaussian_blocksize'])
-        constant = app.config['settings']['gaussian_constant']
-        gray = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                cv2.THRESH_BINARY, blocksize, constant)
-
-    elif bin_method == 'dither':
-        gray = gray.astype(numpy.float)
-        dither_atkinson(gray)
-        gray = gray.astype(numpy.uint8)
-
-    elif bin_method == 'otsu':
-        gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-
+    if bin_method == 'dither':
+        bin_result = gray.astype(numpy.float)
+        dither_atkinson(bin_result)
+        bin_result = bin_result.astype(numpy.uint8)
+    elif bin_method == 'adaptive':
+        gray = cv2.bilateralFilter(gray, 7, 11, 11)
+        blocksize = 3
+        bin_result = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY, blocksize, -1)
     elif bin_method == 'threshold':
-        gray = cv2.threshold(gray, app.config['settings']['threshold'], 255,
-                cv2.THRESH_BINARY)[1]
+        thres = app.config['settings']['threshold']
+        gray[gray > thres] = 255
+        gray[gray <= thres] = 0
+        bin_result = gray
+    else:
+        bin_result = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 
     # Invert
     if app.config['settings']['invert']:
-        gray = numpy.bitwise_not(gray)
+        bin_result = numpy.bitwise_not(bin_result)
 
-    app.send_output(gray)
+    app.send_output(bin_result)
     
 
 def _start_audio_process(app):
@@ -132,7 +122,7 @@ def _start_audio_process(app):
         ]
     else:
         args = [
-            'ffplay',
+            '/usr/local/bin/ffplay',
             '-loglevel', 'panic',
             '-nodisp',
             '-f', device_format,
@@ -216,7 +206,7 @@ def _list_audio_devices_macos():
     """List FFmpeg audio input devices on macOS."""
     output = ''
     try:
-        cmd = ['ffmpeg', '-f', 'avfoundation', '-list_devices', 'true', '-i', '']
+        cmd = ['/usr/local/bin/ffmpeg', '-f', 'avfoundation', '-list_devices', 'true', '-i', '']
         output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
     except OSError as e:
         output = ''
