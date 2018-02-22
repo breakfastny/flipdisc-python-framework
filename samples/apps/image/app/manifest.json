@@ -12,11 +12,13 @@
     },
     "settings": [
         {
+            "label": "Run",
             "name": "run",
             "type": "boolean",
             "default": true
         },
         {
+            "label": "Interactive",
             "name": "interactive",
             "type": "boolean",
             "default": true
@@ -26,37 +28,44 @@
             "name": "background",
             "settings": [
                 {
+                    "label": "Image",
                     "name": "image",
                     "type": "ImageUUID"
                 },
                 {
+                    "label": "Threshold",
                     "name": "threshold",
                     "type": "integer",
                     "default": 128,
                     "range": [0, 255]
                 },
                 {
+                    "label": "Transition",
                     "name": "transition",
                     "type": "boolean",
                     "default": true
                 },
                 {
+                    "label": "Invert",
                     "name": "invert",
                     "type": "boolean",
                     "default": false
                 },
                 {
+                    "label": "Invert particles",
                     "name": "invert_particles",
                     "type": "boolean",
                     "default": false
                 },
                 {
+                    "label": "Resize mode",
                     "name": "resize_mode",
                     "type": "enum",
                     "choices": ["stretch", "contain", "cover", "factor"],
                     "default": "cover"
                 },
                 {
+                    "label": "Resize factor",
                     "name": "resize_factor",
                     "type": "number",
                     "default": 1,
@@ -71,68 +80,80 @@
             "name": "display",
             "settings": [
                 {
+                    "label": "Enabled",
                     "name": "enabled",
                     "type": "boolean",
                     "default": true
                 },
                 {
+                    "label": "Threshold",
                     "name": "threshold",
                     "type": "integer",
                     "default": 39,
                     "range": [0, 255]
                 },
                 {
+                    "label": "Invert",
                     "name": "invert",
                     "type": "boolean",
                     "default": false
                 },
                 {
+                    "label": "Flip mirror",
                     "name": "flip_mirror",
                     "type": "boolean",
                     "default": false
                 },
                 {
+                    "label": "Flip upsidedown",
                     "name": "flip_upsidedown",
                     "type": "boolean",
                     "default": true
                 },
                 {
+                    "label": "Depth min",
                     "name": "depth_min_threshold",
                     "type": "integer",
                     "default": 500,
                     "range": [1, 8000]
                 },
                 {
+                    "label": "Depth max",
                     "name": "depth_max_threshold",
                     "type": "integer",
                     "default": 2833,
                     "range": [1, 8000]
                 },
                 {
+                    "label": "Trim top",
                     "name": "trim_top",
                     "type": "integer",
                     "default": 0,
                     "range": [0, 200]
                 },
                 {
+                    "label": "Trim right",
                     "name": "trim_right",
                     "type": "integer",
                     "default": 26,
                     "range": [0, 200]
                 },
                 {
+                    "label": "Trim bottom",
                     "name": "trim_bottom",
                     "type": "integer",
                     "default": 25,
                     "range": [0, 200]
                 },
                 {
+                    "label": "Trim left",
                     "name": "trim_left",
                     "type": "integer",
                     "default": 19,
                     "range": [0, 200]
                 },
                 {
+                    "label": "Filter threshold",
                     "name": "filter_threshold",
                     "type": "number",
                     "default": 0,
@@ -140,6 +161,7 @@
                     "step": 0.1
                 },
                 {
+                    "label": "Resize mode",
                     "name": "resize_mode",
                     "type": "enum",
                     "choices": ["stretch", "contain", "cover"],
@@ -153,77 +175,90 @@
             "name": "particles",
             "settings": [
                 {
+                    "label": "Gravity enabled",
                     "name": "gravity_enabled",
                     "type": "boolean",
                     "default": true
                 },
                 {
+                    "label": "Gravity",
                     "name": "gravity",
                     "type": "number",
                     "default": 0.2,
                     "range": [0.0, 100.0]
                 },
                 {
+                    "label": "Gravity acceleration",
                     "name": "gravity_acceleration",
                     "type": "number",
                     "default": 1.2,
                     "range": [0.0, 100.0]
                 },
                 {
+                    "label": "Friction",
                     "name": "friction",
                     "type": "number",
                     "default": 0.9,
                     "range": [0.0, 0.99]
                 },
                 {
+                    "label": "Restitution",
                     "name": "restitution",
                     "type": "number",
                     "default": 0.15,
                     "range": [0.0, 1.0]
                 },
                 {
+                    "label": "Speed",
                     "name": "speed",
                     "type": "number",
                     "default": 1,
                     "range": [0.0, 100.0]
                 },
                 {
+                    "label": "Offscreen delay max",
                     "name": "offscreen_delay_max",
                     "type": "number",
                     "default": 7,
                     "range": [0.0, 100.0]
                 },
                 {
+                    "label": "Offscreen delay min",
                     "name": "offscreen_delay_min",
                     "type": "number",
                     "default": 6,
                     "range": [0.0, 100.0]
                 },
                 {
+                    "label": "Spawn radius max",
                     "name": "spawn_radius_max",
                     "type": "number",
                     "default": 45,
                     "range": [0.0, 100.0]
                 },
                 {
+                    "label": "Spawn radius min",
                     "name": "spawn_radius_min",
                     "type": "number",
                     "default": 25,
                     "range": [0.0, 100.0]
                 },
                 {
+                    "label": "Input radius",
                     "name": "input_radius",
                     "type": "number",
                     "default": 2.389,
                     "range": [0.01, 40.0]
                 },
                 {
+                    "label": "Input amplitude",
                     "name": "input_amplitude",
                     "type": "number",
                     "default": 7.294,
                     "range": [0.01, 40.0]
                 },
                 {
+                    "label": "Reverse",
                     "name": "reverse",
                     "type": "boolean",
                     "default": false

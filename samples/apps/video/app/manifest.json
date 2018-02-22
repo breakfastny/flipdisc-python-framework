@@ -12,37 +12,44 @@
     },
     "settings": [
         {
+            "label": "Video",
             "name": "video",
             "type": "VideoUUID"
         },
         {
+            "label": "Play",
             "name": "play",
             "type": "boolean",
             "default": true
         },
         {
+            "label": "Loop",
             "name": "loop",
             "type": "boolean",
             "default": true
         },
         {
+            "label": "Binarize",
             "name": "binarize",
             "type": "enum",
             "choices": ["dither", "otsu", "adaptive", "threshold"],
             "default": "otsu"
         },
         {
+            "label": "Threshold",
             "name": "threshold",
             "type": "integer",
             "default": 128,
             "range": [0, 255]
         },
         {
+            "label": "Invert",
             "name": "invert",
             "type": "boolean",
             "default": false
         },
         {
+            "label": "Resize mode",
             "name": "resize_mode",
             "type": "enum",
             "choices": ["stretch", "contain", "cover"],
@@ -52,24 +59,28 @@
             "name": "trim",
             "settings": [
                 {
+                    "label": "Top",
                     "name": "top",
                     "type": "integer",
                     "range": [0, 200],
                     "default": 0
                 },
                 {
+                    "label": "Right",
                     "name": "right",
                     "type": "integer",
                     "range": [0, 200],
                     "default": 0
                 },
                 {
+                    "label": "Bottom",
                     "name": "bottom",
                     "type": "integer",
                     "range": [0, 200],
                     "default": 0
                 },
                 {
+                    "label": "Left",
                     "name": "left",
                     "type": "integer",
                     "range": [0, 200],
