@@ -46,7 +46,7 @@
             "name": "resize_mode",
             "type": "enum",
             "choices": ["stretch", "contain", "cover"],
-            "default": "stretch"
+            "default": "cover"
         },
         {
             "name": "trim",

@@ -40,7 +40,7 @@
             "name": "resize_mode",
             "type": "enum",
             "choices": ["stretch", "contain", "cover", "factor"],
-            "default": "stretch"
+            "default": "cover"
         },
         {
             "label": "Resize Factor",
