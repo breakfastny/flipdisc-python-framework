@@ -98,7 +98,7 @@ def update_app(app):
         if curr_video:
             app.movie = Movie(curr_video,
                     desired_size=get_out_shape(app),
-                    audio=app.audio if app.config['settings']['system']['audio'] else None)
+                    audio=app.audio)
             app.movie.video_callback(partial(render, app))
             app.movie.start()
             if not app.play:
@@ -135,7 +135,10 @@ def _get_playlist_item_hash(app):
 def main(cfg_path):
     app = Application("video", cfg_path, setup_input=False, verbose=True)
     app.log = logging.getLogger(__name__)
-    app.audio = pyaudio.PyAudio()
+    if app.config['settings']['system']['audio']:
+        app.audio = pyaudio.PyAudio()
+    else:
+        app.audio = None
     app.suspended = False
     app.finished = False
     app.play = app.config['settings']['play']
@@ -143,7 +146,7 @@ def main(cfg_path):
     app.current_hash = _get_playlist_item_hash(app)
     app.movie = Movie(app.config['settings']['video'],
             desired_size=get_out_shape(app),
-            audio=app.audio if app.config['settings']['system']['audio'] else None)
+            audio=app.audio)
 
     app.movie.video_callback(partial(render, app))
     app.set_redis_callback(channel_update)
