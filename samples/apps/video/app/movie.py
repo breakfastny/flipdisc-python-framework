@@ -33,7 +33,8 @@ class Movie(object):
         self._audio_queue = Queue()
         self._first_video_ts = None
 
-        self._container = av.open(str(filepath))
+        self._f = open(str(filepath))
+        self._container = av.open(self._f)
 
         self._video_stream = None
         self._audio_stream = None
@@ -116,6 +117,15 @@ class Movie(object):
             self._proc.join()
             self._proc = None
             self._log.info('closed')
+
+        if self._f:
+            self._f.close()
+
+        # prevent /dev/shm and pipe fd leak
+        del self._video_queue
+        del self._audio_queue
+        del self._keep_queueing
+        del self._finished
 
     def video_callback(self, cb):
         if self._stop:
