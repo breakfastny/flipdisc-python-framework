@@ -115,6 +115,7 @@ class Movie(object):
             self._log.info('closing enqueuer process..')
             self._proc.terminate()
             self._proc.join()
+            del self._proc
             self._proc = None
             self._log.info('closed')
 
@@ -126,6 +127,8 @@ class Movie(object):
         del self._audio_queue
         del self._keep_queueing
         del self._finished
+        del self._container
+        del self._video_stream
 
     def video_callback(self, cb):
         if self._stop:
