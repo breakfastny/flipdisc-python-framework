@@ -315,15 +315,16 @@ class Application(object):
         if not self._out_socket:
             raise Exception("output stream not configured")
 
-        self._sent += 1
+        # Wrap the sent count to uint32
+        self._sent = (self._sent + 1) & 0xffffffff
         topic = self._out_topic if topic is None else bytes(topic)
         if self._out_transition:
             # When (potentially) using transitions, also send the app name.
             data = [b'%s\x00' % topic, b'%s\x00' % self.name,
-                    struct.pack('i', self._sent), result.tobytes()]
+                    struct.pack('I', self._sent), result.tobytes()]
         else:
             data = [b'%s\x00' % topic,
-                    struct.pack('i', self._sent), result.tobytes()]
+                    struct.pack('I', self._sent), result.tobytes()]
         self._out_socket.send_multipart(data, copy=False)
         return self._sent
 
