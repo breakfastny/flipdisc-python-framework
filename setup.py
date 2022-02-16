@@ -24,7 +24,7 @@ def run_setup():
 
     setup(
         name='flipdisc',
-        version='0.5.3',
+        version='0.5.4',
         url='https://github.com/breakfastny/flipdisc-python-framework',
         packages=['flipdisc', 'flipdisc.framework'],
         package_data={
