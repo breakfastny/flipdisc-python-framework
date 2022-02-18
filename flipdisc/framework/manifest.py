@@ -6,7 +6,7 @@ from jsonschema import Draft4Validator, validate as validate_schema
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-__all__ = ['validate', 'export_settings']
+__all__ = ["validate", "export_settings"]
 
 
 def open_schema(schema_name):
@@ -28,7 +28,7 @@ def validate(manifest):
     """
     if isinstance(manifest, str):
         manifest = json.load(open(manifest))
-    validate_schema(manifest, read_schema('userapp.json'))
+    validate_schema(manifest, read_schema("userapp.json"))
     return manifest
 
 
@@ -38,12 +38,12 @@ def export_settings(manifest):
     The string "<NO_DEFAULT>" is used for entries without default values.
     """
     config = {}
-    for entry in manifest['settings']:
-        if 'settings' in entry:
+    for entry in manifest["settings"]:
+        if "settings" in entry:
             # Nested settings.
-            config[entry['name']] = export_settings(entry)
+            config[entry["name"]] = export_settings(entry)
         else:
-            config[entry['name']] = entry.get('default', '<NO_DEFAULT>')
+            config[entry["name"]] = entry.get("default", "<NO_DEFAULT>")
 
     return config
 
