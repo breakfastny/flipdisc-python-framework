@@ -399,7 +399,7 @@ class Application(object):
             self._cb_app_heartbeat = ioloop.PeriodicCallback(
                     self._app_heartbeat, 1000)
             self._cb_app_heartbeat.start()
-        for cb in self._periodic_callbacks.values():
+        for cb in list(self._periodic_callbacks.values()):
             if not cb.is_running():
                 cb.start()
         ioloop.IOLoop.current().start()
@@ -409,7 +409,7 @@ class Application(object):
         Call this before quitting to stop registered callbacks and
         unregister the app from redis.
         """
-        for cb in self._periodic_callbacks.values():
+        for cb in list(self._periodic_callbacks.values()):
             cb.stop()
         if self._cb_app_heartbeat:
             self._cb_app_heartbeat.stop()
@@ -486,7 +486,7 @@ def _update_settings(settings, new):
     # Restrict key updates to those that already exist and
     # enforce the values to be of same type.
     def update(orig_data, new_data):
-        for key, new_value in new_data.items():
+        for key, new_value in list(new_data.items()):
             if key in orig_data:
                 if isinstance(new_value, collections.Mapping):
                     # Recurse on nested settings.
