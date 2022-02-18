@@ -3,28 +3,27 @@ from flipdisc._particle import lib, ffi
 __all__ = ["Emitter"]
 
 _EMITTER_KEYS = {
-    'input_radius': float,
-    'input_amplitude': float,
+    "input_radius": float,
+    "input_amplitude": float,
 }
 _PARTICLE_KEYS = {
-    'friction': float,
-    'gravity': float,
-    'gravity_acceleration': float,
-    'gravity_enabled': bool,
-    'restitution': float,
-    'offscreen_delay_max': float,
-    'offscreen_delay_min': float,
-    'spawn_radius_max': float,
-    'spawn_radius_min': float,
-    'speed': float,
+    "friction": float,
+    "gravity": float,
+    "gravity_acceleration": float,
+    "gravity_enabled": bool,
+    "restitution": float,
+    "offscreen_delay_max": float,
+    "offscreen_delay_min": float,
+    "spawn_radius_max": float,
+    "spawn_radius_min": float,
+    "speed": float,
 }
-_LIMIT_TO_01 = frozenset(['friction', 'restitution'])
-_LIMIT_TO_0 = frozenset(['gravity'])
+_LIMIT_TO_01 = frozenset(["friction", "restitution"])
+_LIMIT_TO_0 = frozenset(["gravity"])
 
 
 class Emitter(object):
-
-    def __init__(self, step=1./30):
+    def __init__(self, step=1.0 / 30):
         self._ctx = lib.emitter_context()
         self._step = step
         self._elapsed = 0.0
@@ -50,9 +49,7 @@ class Emitter(object):
 
     def get_settings(self):
         pctx = self._ctx.pctx
-        settings = {
-            'size': {'x': pctx.size.x, 'y': pctx.size.y}
-        }
+        settings = {"size": {"x": pctx.size.x, "y": pctx.size.y}}
         for name in _PARTICLE_KEYS:
             settings[name] = getattr(pctx, name)
         return settings
@@ -88,5 +85,5 @@ class Emitter(object):
 
     def draw(self, mat, value=255):
         height, width = mat.shape
-        arr = ffi.cast('uint8_t*', ffi.from_buffer(mat))
+        arr = ffi.cast("uint8_t*", ffi.from_buffer(mat))
         lib.particles_draw(self._ctx.pctx, value, arr, width, height)

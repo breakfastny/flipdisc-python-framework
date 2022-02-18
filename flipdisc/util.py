@@ -25,7 +25,7 @@ def flip(arr, mirror, upsidedown):
 
 def pad(image, size, value=0):
     """Pad and return image with border size and value specified."""
-    return numpy.pad(image, size, 'constant', constant_values=value)
+    return numpy.pad(image, size, "constant", constant_values=value)
 
 
 def resize(image, target_size):
@@ -65,9 +65,11 @@ def copy_to_center(dest, img):
     dest_height, dest_width = dest.shape
     src_height, src_width = img.shape
     if src_height > dest_height or src_width > dest_width:
-        raise Exception('img %s is larger than dest %s' % (img.shape, dest.shape))
+        raise Exception("img %s is larger than dest %s" % (img.shape, dest.shape))
 
     d_half = dest_height / 2, dest_width / 2
     (half_h, half_exh), (half_w, half_exw) = divmod(src_height, 2), divmod(src_width, 2)
-    dest[d_half[0] - half_h:d_half[0] + half_h + half_exh,
-         d_half[1] - half_w:d_half[1] + half_w + half_exw] = img
+    dest[
+        d_half[0] - half_h : d_half[0] + half_h + half_exh,
+        d_half[1] - half_w : d_half[1] + half_w + half_exw,
+    ] = img
