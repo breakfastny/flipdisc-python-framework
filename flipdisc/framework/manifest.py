@@ -26,7 +26,7 @@ def validate(manifest):
 
     manifest can be a dict object (returned as is) or a filename.
     """
-    if isinstance(manifest, basestring):
+    if isinstance(manifest, str):
         manifest = json.load(open(manifest))
     validate_schema(manifest, read_schema('userapp.json'))
     return manifest
@@ -50,4 +50,4 @@ def export_settings(manifest):
 
 if __name__ == "__main__":
     result = export_settings(validate(sys.argv[1]))
-    print json.dumps({"settings": result}, indent=4)
+    print(json.dumps({"settings": result}, indent=4))
