@@ -25,7 +25,6 @@ setup(
         "pyzmq>=16.0.2",
         "tornado>=4.4.2",
         "toredis>=0.1.2",
-        "attrdict>=2.0.0",
         "jsonschema>=2.6.0",
     ],
     ext_modules=[
