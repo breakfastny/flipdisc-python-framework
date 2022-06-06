@@ -4,18 +4,17 @@ import struct
 import logging
 import logging.config
 import collections
-from functools import partial
+import functools
 
 import numpy
-import zmq
-from zmq.eventloop import zmqstream, ioloop
+import zmq.asyncio
 
-from .red import ReconnectingRedis
+import redis
 from .common import REDIS_KEYS, INPUT_STREAM, HDMI_INPUT_STREAM, OUTPUT_STREAM
 
-__all__ = ["Application"]
+from typing import List
 
-ioloop.install()
+__all__ = ["Application"]
 
 
 class Application(object):
@@ -124,15 +123,16 @@ class Application(object):
             raise ValueError("App name is required to use transitions")
 
         if self.name:
-            subtopic = ":%s" % subtopic if subtopic else ""
             self._app_rkey = self.name + subtopic
+            if subtopic is not None:
+                self._app_rkey += ":" + subtopic
             sub_channels.append(REDIS_KEYS.APP_CHANNEL + self._app_rkey)
         else:
             self._app_rkey = None
 
-        self._ctx = zmq.Context()
+        self._ctx = zmq.asyncio.Context()
         self._in_stream = {}
-        self._sent = 0
+        self._sent: int = 0
         self._out_socket = None
         self._out_topic = None
         if setup_input:
@@ -153,9 +153,10 @@ class Application(object):
             self._red = None
             self._red_sub = None
         else:
-            self._red = ReconnectingRedis()
-            self._red_sub = ReconnectingRedis("pubsub")
+            self._red = redis.Redis()
+            self._red_sub = redis.Redis()
             self._setup_redis(sub_channels)
+
 
     def setup_input(
         self, cfg="input_stream", topic=INPUT_STREAM, bind=False, watermark=0
@@ -177,8 +178,11 @@ class Application(object):
             in_socket.bind(sock_address)
         else:
             in_socket.connect(sock_address)
+
+        # TODO(wrigby) Replace ZMQStream with asyncio
         self._in_stream[cfg] = zmqstream.ZMQStream(in_socket)
 
+        # TODO(wrigby): This is quite hacky - we shouldn't be doing this
         callback = getattr(self, "_input_callback_%s" % cfg, None)
         if callback is None:
             raise Exception("Implementation not available for %s configuration" % cfg)
@@ -303,11 +307,11 @@ class Application(object):
             return
 
         sock_address = self.config[cfg]["socket"]
-        subtopic = self.config[cfg].get("subtopic")
+        subtopic: str = self.config[cfg].get("subtopic")
         subtopic = ":%s" % subtopic if subtopic else ""
 
         self._out_socket = self._ctx.socket(zmq.PUB)
-        self._out_topic = bytes("%s%s" % (OUTPUT_STREAM, subtopic))
+        self._out_topic = bytes(OUTPUT_STREAM + subtopic)
         if bind is None:
             bind = (not self._out_transition) and (not self._out_preview)
         if bind:
@@ -322,13 +326,13 @@ class Application(object):
             self._out_topic,
         )
 
-    def send_output(self, result, topic=None):
+    async def send_output(self, result, topic=None) -> int:
         """
         Publish result using the output socket configured by setup_output.
 
         An integer is returned. This number indicates the number of frames
         sent so far, i.e. the number of send_output invocations, starting
-        from 1.
+        from 1, wrapping around to 0 at UINT32_MAX.
         """
         if not self._out_socket:
             raise Exception("output stream not configured")
@@ -346,15 +350,15 @@ class Application(object):
             ]
         else:
             data = [b"%s\x00" % topic, struct.pack("I", self._sent), result.tobytes()]
-        self._out_socket.send_multipart(data, copy=False)
+        await self._out_socket.send_multipart(data, copy=False)
         return self._sent
 
-    def notify(self, channel, data):
+    async def notify(self, channel, data):
         """Send json.dumps(data) to a channel using redis pubsub."""
         if not self._red:
             raise Exception("redis not enabled")
         self._log.debug("Redis outgoing, channel: %s, data: %s", channel, data)
-        return self._red.publish(channel, json.dumps(data))
+        return await self._red.publish(channel, json.dumps(data))
 
     def set_redis_callback(self, function):
         """
@@ -421,7 +425,7 @@ class Application(object):
         if self.name and self._red is not None:
             self._cb_app_heartbeat = ioloop.PeriodicCallback(self._app_heartbeat, 1000)
             self._cb_app_heartbeat.start()
-        for cb in list(self._periodic_callbacks.values()):
+        for cb in self._periodic_callbacks.values():
             if not cb.is_running():
                 cb.start()
         ioloop.IOLoop.current().start()
@@ -431,7 +435,7 @@ class Application(object):
         Call this before quitting to stop registered callbacks and
         unregister the app from redis.
         """
-        for cb in list(self._periodic_callbacks.values()):
+        for cb in self._periodic_callbacks.values():
             cb.stop()
         if self._cb_app_heartbeat:
             self._cb_app_heartbeat.stop()
@@ -445,19 +449,20 @@ class Application(object):
         if self._red.is_connected():
             self._red.hset(REDIS_KEYS.APPS, self._app_rkey, json.dumps(self.config))
 
-    def _setup_redis(self, channels):
-        cfg = {"host": "localhost", "port": 6379, "callback": self._on_redis_connect}
-        if "redis" in self.config:
-            if "host" in self.config["redis"]:
-                cfg["host"] = self.config["redis"]["host"]
-            if "port" in self.config["redis"]:
-                cfg["port"] = self.config["redis"]["port"]
+    def _setup_redis(self, channels: List[str]):
+        config = self.config.get("redis", {})
+        host = config.get("host", "localhost")
+        port = config.get("port", 6379)
 
         # Keep one redis connection for regular commands.
-        self._red.connect(**cfg)
+        self._red.connect(host=host, port=port, callback=self._on_redis_connect)
+
         # And another redis connection for pubsub.
-        cb = partial(cfg.pop("callback"), sub_channels=channels)
-        self._red_sub.connect(callback=cb, **cfg)
+        self._red_sub.connect(
+            host=host,
+            port=port,
+            callback=functools.partial(self._on_redis_connect, sub_channels=channels),
+        )
 
     def _on_redis_message(self, msg):
         if msg is None:
@@ -509,7 +514,7 @@ def _update_settings(settings, new):
     # Restrict key updates to those that already exist and
     # enforce the values to be of same type.
     def update(orig_data, new_data):
-        for key, new_value in list(new_data.items()):
+        for key, new_value in new_data.items():
             if key in orig_data:
                 if isinstance(new_value, collections.Mapping):
                     # Recurse on nested settings.
