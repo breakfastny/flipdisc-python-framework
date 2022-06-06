@@ -6,3 +6,6 @@ samples/**/*.zip
 *.egg-info/
 *.so
 *.pyc
+*.rdb
+flipdisc-core*
+binarize.c

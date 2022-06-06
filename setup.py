@@ -11,21 +11,21 @@ def get_numpy_include():
 
 setup(
     name="flipdisc",
-    version="0.5.4",
+    version="0.6.0",
     url="https://github.com/breakfastny/flipdisc-python-framework",
     packages=["flipdisc", "flipdisc.framework"],
     package_data={
         "flipdisc.framework": ["*.json"],
     },
+    python_requires='>=3.7.*',
     setup_requires=["cffi>=1.0.0", "cython"],
     cffi_modules=["flipdisc/build_particle.py:ffibuilder"],
     install_requires=[
-        "cffi>=1.0.0",
-        "numpy>=1.12.1",
-        "pyzmq>=16.0.2",
-        "tornado>=4.4.2",
-        "toredis>=0.1.2",
-        "jsonschema>=2.6.0",
+        "cffi==1.15.0",
+        "numpy==1.21.6",
+        "jsonschema==4.6.0",
+        "pyzmq==23.2.0",
+        "redis==4.3.3"
     ],
     ext_modules=[
         Extension(
