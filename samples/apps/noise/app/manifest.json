@@ -1,0 +1,21 @@
+{
+    "name": "Noise Demo",
+    "name_plural": "Noise Demos",
+    "icons": {
+        "small": "icon/demo.svg",
+        "large": "icon/demo.svg"
+    },
+    "system": {
+        "name": "noise",
+        "entrypoint": "noise.py",
+        "execution_profile": "python3"
+    },
+    "settings": [
+        {
+            "label": "Run",
+            "name": "run",
+            "type": "boolean",
+            "default": true
+        }
+    ]
+}

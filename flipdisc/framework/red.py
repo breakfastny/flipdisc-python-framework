@@ -1,44 +1,54 @@
-import random
+import asyncio
 import logging
+import random
+from redis import RedisError
+import redis.asyncio
 
-from toredis import Client as RedisClient
-
-__all__ = ["ReconnectingRedis"]
+from .common import REDIS_KEYS
 
 
-class ReconnectingRedis(RedisClient):
-    def __init__(self, suffix=None, *args, **kwargs):
-        super(ReconnectingRedis, self).__init__(*args, **kwargs)
+class ReconnectingRedis(redis.asyncio.Redis):
+    def __init__(self, suffix, host, port, db, password, retry_on_timeout):
         self._log = logging.getLogger(__name__)
-        self._retry = 1
+        self._retry_delay = 1
         self._name = "redis%s" % ("-%s" % suffix if suffix else "")
+        self._host = host
+        self._port = port
+        self._pool = redis.asyncio.ConnectionPool(
+            host=host,
+            port=port,
+            db=db,
+            password=password,
+            retry_on_timeout=retry_on_timeout,
+        )
+        super().__init__(connection_pool=self._pool)
+        self.psub = self.pubsub()
 
-    def connect(self, host, port, callback=None):
-        self.host = host
-        self.port = port
-        self.callback = callback
-        self._reconnect()
-
-    def on_disconnect(self):
-        self._log.error("%s not connected, retrying in %s", self._name, self._retry)
-        self._io_loop.call_later(self._retry, self._reconnect)
-
-    def _reconnect(self):
-        try:
-            super(ReconnectingRedis, self).connect(self.host, self.port, self.callback)
-            self._retry = 1
-        except Exception as err:
-            self._retry *= 2
-            self._retry += random.random()
-            if self._retry > 10:
-                self._retry = 1
-            self._log.error(
-                "%s failed to connect to %s:%s - %s",
-                self._name,
-                self.host,
-                self.port,
-                err,
-            )
-        else:
-            if self.is_connected():
+    async def subscribe(self, callback, *channels):
+        while True:
+            try:
+                await self.psub.subscribe(*channels)
+                self._retry_delay = 1
                 self._log.debug("%s connected", self._name)
+
+                while True:
+                    async for msg in self.psub.listen():
+                        callback(msg)
+                    await asyncio.sleep(0.01)
+
+            except Exception as err:
+                self._log.error(
+                    "%s failed to connect to %s:%s - %s",
+                    self._name,
+                    self._host,
+                    self._port,
+                    err,
+                )
+
+                await self.psub.reset()
+
+                self._retry_delay *= 2
+                self._retry_delay += random.random()
+                self._retry_delay = min(self._retry_delay, 10)
+
+            await asyncio.sleep(self._retry_delay)
