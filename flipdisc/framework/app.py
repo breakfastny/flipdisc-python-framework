@@ -4,10 +4,11 @@ import struct
 import logging
 import logging.config
 import collections
-import functools
+import asyncio
 
 import numpy
 import zmq.asyncio
+import zmq.eventloop.zmqstream
 
 import redis
 from .common import REDIS_KEYS, INPUT_STREAM, HDMI_INPUT_STREAM, OUTPUT_STREAM
@@ -123,10 +124,10 @@ class Application(object):
             raise ValueError("App name is required to use transitions")
 
         if self.name:
-            self._app_rkey = self.name + subtopic
+            self._app_rkey = self.name
             if subtopic is not None:
                 self._app_rkey += ":" + subtopic
-            sub_channels.append(REDIS_KEYS.APP_CHANNEL + self._app_rkey)
+            sub_channels.append(REDIS_KEYS.APP_CHANNEL.value + self._app_rkey)
         else:
             self._app_rkey = None
 
@@ -143,7 +144,7 @@ class Application(object):
             self.setup_output()
 
         self._cb_app_heartbeat = None
-        self._periodic_callbacks = {}
+        self._scheduled_functions = {}
 
         self._redis_sub_callback = None
         use_redis = True
@@ -153,9 +154,9 @@ class Application(object):
             self._red = None
             self._red_sub = None
         else:
-            self._red = redis.Redis()
-            self._red_sub = redis.Redis()
             self._setup_redis(sub_channels)
+
+        self._loop = asyncio.get_event_loop()
 
 
     def setup_input(
@@ -170,7 +171,7 @@ class Application(object):
 
         sock_address = self.config[cfg]["socket"]
         in_socket = self._ctx.socket(zmq.SUB)
-        in_socket.setsockopt(zmq.SUBSCRIBE, topic)
+        in_socket.setsockopt_string(zmq.SUBSCRIBE, topic)
         if watermark > 0:
             in_socket.set_hwm(watermark)
 
@@ -180,7 +181,7 @@ class Application(object):
             in_socket.connect(sock_address)
 
         # TODO(wrigby) Replace ZMQStream with asyncio
-        self._in_stream[cfg] = zmqstream.ZMQStream(in_socket)
+        self._in_stream[cfg] = zmq.eventloop.zmqstream.ZMQStream(in_socket)
 
         # TODO(wrigby): This is quite hacky - we shouldn't be doing this
         callback = getattr(self, "_input_callback_%s" % cfg, None)
@@ -311,7 +312,7 @@ class Application(object):
         subtopic = ":%s" % subtopic if subtopic else ""
 
         self._out_socket = self._ctx.socket(zmq.PUB)
-        self._out_topic = bytes(OUTPUT_STREAM + subtopic)
+        self._out_topic = bytes(OUTPUT_STREAM + subtopic, encoding='utf8')
         if bind is None:
             bind = (not self._out_transition) and (not self._out_preview)
         if bind:
@@ -375,21 +376,19 @@ class Application(object):
         The returned key can be used with stop_periodic_callback to stop
         the scheduling.
         """
-        cb = ioloop.PeriodicCallback(
-            lambda: function(self), float_sec * 1000
-        )  # convert to ms
-        key = id(cb)
-        self._periodic_callbacks[key] = cb
+        periodic = self.ScheduledFunction(function, float_sec, True, self._loop)
+        key = id(periodic)
+        self._scheduled_functions[key] = periodic
         if start:
-            cb.start()
+            periodic.start()
         return key
 
     def stop_periodic_callback(self, key):
         """
         Stop a periodic callback created with add_periodic_callback.
         """
-        cb = self._periodic_callbacks.pop(key)
-        cb.stop()
+        periodic = self._scheduled_functions.pop(key)
+        periodic.stop()
 
     def call_later(self, float_sec, function, *args, **kwargs):
         """
@@ -398,23 +397,22 @@ class Application(object):
         The returned handle can be used with cancel_call_later to cancel the
         future call.
         """
-        handle = ioloop.IOLoop.current().call_later(
-            float_sec, function, *args, **kwargs
-        )
-        return handle
+        func = self.ScheduledFunction(function, float_sec, False, self._loop)
+        func.start()
+        return func
 
     def cancel_call_later(self, handle):
         """
         Stop a scheduled call_later function from running.
         """
-        ioloop.IOLoop.current().remove_timeout(handle)
+        handle.stop()
 
     def stop_ioloop(self):
         """
         Stop the event loop.
         Note: call the cleanup function after this one if the app is quitting.
         """
-        ioloop.IOLoop.current().stop()
+        self._loop.stop()
 
     def run(self):
         """
@@ -423,31 +421,36 @@ class Application(object):
         redis if it's enabled.
         """
         if self.name and self._red is not None:
-            self._cb_app_heartbeat = ioloop.PeriodicCallback(self._app_heartbeat, 1000)
-            self._cb_app_heartbeat.start()
-        for cb in self._periodic_callbacks.values():
-            if not cb.is_running():
-                cb.start()
-        ioloop.IOLoop.current().start()
+            key = self.add_periodic_callback(self._app_heartbeat, 1, True)
+            self._cb_app_heartbeat = self._scheduled_functions[key]
+        for pf in self._scheduled_functions.values():
+            if not pf.started:
+                pf.start()
+        tasks = [x.get_task() for x in self._scheduled_functions.values()]
+        group = asyncio.gather(*tasks)
+        self._loop.run_until_complete(group)
 
     def cleanup(self):
         """
         Call this before quitting to stop registered callbacks and
         unregister the app from redis.
         """
-        for cb in self._periodic_callbacks.values():
-            cb.stop()
+        for pf in self._scheduled_functions.values():
+            pf.stop()
         if self._cb_app_heartbeat:
             self._cb_app_heartbeat.stop()
-        if self.name and self._red is not None:
+        # TODO see what's happening here
+        # if self.name and self._red is not None:
             # Unregister app from redis.
-            self._red.hdel(REDIS_KEYS.APPS, self._app_rkey)
+            # self._red.hdel(REDIS_KEYS.APPS, self._app_rkey)
 
-    def _app_heartbeat(self):
+    async def _app_heartbeat(self):
         # Update register on redis to indicate that the app is running well.
         self.config["timestamp"] = time.time()
-        if self._red.is_connected():
+        try:
             self._red.hset(REDIS_KEYS.APPS, self._app_rkey, json.dumps(self.config))
+        except:
+            self._log.error("No redis configuration was found") 
 
     def _setup_redis(self, channels: List[str]):
         config = self.config.get("redis", {})
@@ -455,14 +458,16 @@ class Application(object):
         port = config.get("port", 6379)
 
         # Keep one redis connection for regular commands.
-        self._red.connect(host=host, port=port, callback=self._on_redis_connect)
+        self._red = redis.Redis(
+            host=host,
+            port=port)
+        # TODO(sebschlo) replace `callback=self._on_redis_connect`
 
         # And another redis connection for pubsub.
-        self._red_sub.connect(
+        self._red_sub = redis.Redis(
             host=host,
-            port=port,
-            callback=functools.partial(self._on_redis_connect, sub_channels=channels),
-        )
+            port=port)
+        # TODO(sebschlo) replace callback=functools.partial(self._on_redis_connect, sub_channels=channels)
 
     def _on_redis_message(self, msg):
         if msg is None:
@@ -508,6 +513,41 @@ class Application(object):
 
         if sub_channels:
             self._red_sub.subscribe(sub_channels, self._on_redis_message)
+
+    class ScheduledFunction:
+        def __init__(self, function, delay, periodic, loop):
+            self.delay = delay
+            self.function = function
+            self.periodic = periodic
+            self.started = False
+            self._loop = loop
+            self._task = None
+
+        def get_task(self):
+            return self._task
+
+        def start(self):
+            if not self.started:
+                self.started = True
+                try:
+                    self._task = self._loop.create_task(self._run())
+                except asyncio.CancelledError:
+                    pass
+
+        def stop(self):
+            if self.started:
+                self.started = False
+                self._task.cancel()
+
+        async def _run(self):
+            if self.periodic == True:
+                while True:
+                    await asyncio.gather(
+                        asyncio.sleep(self.delay),
+                        self.function(),
+                    )
+            else:
+                self._loop.call_later(self.delay, self.function)
 
 
 def _update_settings(settings, new):
