@@ -27,3 +27,5 @@ Install the flipdisc python package:
 ```
 pip install numpy flipdisc
 ```
+
+Visit the [Getting Started Guide](https://github.com/breakfastny/flipdisc-python-framework/wiki/Getting-started) for further instruction.
