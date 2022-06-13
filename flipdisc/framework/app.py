@@ -5,12 +5,11 @@ import logging
 import logging.config
 import collections
 import asyncio
-
 import numpy
 from redis import RedisError
 
 import zmq.asyncio
-import zmq.eventloop.zmqstream
+import redis
 
 import redis.asyncio.client as rc
 import redis.asyncio
@@ -88,6 +87,10 @@ class Application(object):
 
         self._log = logging.getLogger(__name__)
 
+        self._loop = asyncio.get_event_loop()
+        self._cb_app_heartbeat = None
+        self._scheduled_functions = {}
+
         # List of redis channels to subscribe.
         self._sub_channels = []
 
@@ -155,8 +158,6 @@ class Application(object):
             self.setup_input("hdmi_stream", HDMI_INPUT_STREAM)
         if setup_output:
             self.setup_output()
-
-        self._scheduled_functions = {}
 
     async def setup_redis(self):
         self._cb_app_heartbeat = None
@@ -228,14 +229,21 @@ class Application(object):
         else:
             in_socket.connect(sock_address)
 
-        # TODO(wrigby) Replace ZMQStream with asyncio
-        self._in_stream[cfg] = zmq.eventloop.zmqstream.ZMQStream(in_socket)
-
         # TODO(wrigby): This is quite hacky - we shouldn't be doing this
         callback = getattr(self, "_input_callback_%s" % cfg, None)
         if callback is None:
             raise Exception("Implementation not available for %s configuration" % cfg)
-        self._in_stream[cfg].on_recv(callback, copy=False)
+
+        async def receive_stream(socket, callback):
+            while True:
+                try:
+                    msg = await socket.recv_multipart()
+                    callback(msg)
+                except:
+                    self._log.error('Error waiting for ZMQ stream message')
+                    pass
+        
+        self._in_stream[cfg] = self._loop.create_task(receive_stream(in_socket, callback))
 
         self._log.debug(
             "SUB socket %s to %s, topic %s",
@@ -243,6 +251,7 @@ class Application(object):
             sock_address,
             topic,
         )
+
 
     def set_input_callback(self, function, stream="input_stream"):
         """
@@ -253,21 +262,20 @@ class Application(object):
 
     def _input_callback_output_stream(self, msg):
         cb = self._input_callback.get("output_stream")
-        res = msg.result()
 
         if cb is None or msg is None:
             return
 
-        if len(res) != 3:
+        if len(msg) != 3:
             self._log.error("expected output message of size %d, got %d", 3, len(msg))
             return
 
-        topic = msg[0].bytes.decode('UTF-8')
+        topic = msg[0].decode('UTF-8')
         subtopic = topic.split(":", 1)[1].rstrip(b"\x00") if ":" in topic else None
-        frame_num = struct.unpack("i", res[1])[0]
-        binimage_frame = res[2]
+        frame_num = struct.unpack("i", msg[1])[0]
+        binimage_frame = msg[2]
 
-        bin_image = numpy.frombuffer(binimage_frame.bytes, dtype=self._bin_dtype)
+        bin_image = numpy.frombuffer(binimage_frame, dtype=self._bin_dtype)
         try:
             bin_image = bin_image.reshape(self._bin_shape)
         except ValueError:
@@ -295,7 +303,7 @@ class Application(object):
         frame_num = struct.unpack("i", msg[2])[0]
         binimage_frame = msg[3]
 
-        bin_image = numpy.frombuffer(binimage_frame.bytes, dtype=self._bin_dtype)
+        bin_image = numpy.frombuffer(binimage_frame, dtype=self._bin_dtype)
         try:
             bin_image = bin_image.reshape(self._bin_shape)
         except ValueError:
@@ -318,8 +326,8 @@ class Application(object):
         depth_frame = msg[2]
         bgr_frame = msg[3]
 
-        depth = numpy.frombuffer(depth_frame.bytes, dtype=self._depth_dtype)
-        bgr = numpy.frombuffer(bgr_frame.bytes, dtype=self._bgr_dtype)
+        depth = numpy.frombuffer(depth_frame, dtype=self._depth_dtype)
+        bgr = numpy.frombuffer(bgr_frame, dtype=self._bgr_dtype)
         try:
             depth = depth.reshape(self._depth_shape)
             bgr = bgr.reshape(self._bgr_shape)
@@ -341,7 +349,7 @@ class Application(object):
         frame_num = struct.unpack("i", msg[1])[0]
         bgr_frame = msg[2]
 
-        bgr = numpy.frombuffer(bgr_frame.bytes, dtype=self._hdmi_dtype)
+        bgr = numpy.frombuffer(bgr_frame, dtype=self._hdmi_dtype)
         try:
             bgr = bgr.reshape(self._hdmi_shape)
         except ValueError:
@@ -486,6 +494,8 @@ class Application(object):
         """
         for pf in self._scheduled_functions.values():
             pf.stop()
+        for t in self._in_stream.values():
+            t.cancel()
         if self._cb_app_heartbeat:
             self._cb_app_heartbeat.stop()
         if self.name and self._red is not None:
