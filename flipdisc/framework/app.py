@@ -7,11 +7,20 @@ import collections
 import asyncio
 
 import numpy
+from redis import RedisError
+
 import zmq.asyncio
 import zmq.eventloop.zmqstream
 
-import redis
+import redis.asyncio.client as rc
+
+#TODO remove
+import datetime
+
+from flipdisc.framework.red import ReconnectingRedis
+
 from .common import REDIS_KEYS, INPUT_STREAM, HDMI_INPUT_STREAM, OUTPUT_STREAM
+from .common import ScheduledFunction
 
 from typing import List
 
@@ -77,16 +86,17 @@ class Application(object):
         self._log = logging.getLogger(__name__)
 
         # List of redis channels to subscribe.
-        sub_channels = []
+        self._sub_channels = []
 
         self._input_callback = {}
+        self._loop = asyncio.get_event_loop()
 
         if "input_stream" in config:
             input_width = config["input_stream"]["width"]
             input_height = config["input_stream"]["height"]
             self._bgr_shape = (input_height, input_width, 3)
             self._depth_shape = (input_height, input_width)
-            sub_channels.append(REDIS_KEYS.SYS_INPUT_CHANNEL)
+            self._sub_channels.append(REDIS_KEYS.SYS_INPUT_CHANNEL.value)
         else:
             setup_input = False
             self._bgr_shape = None
@@ -96,7 +106,7 @@ class Application(object):
             hdmi_width = config["hdmi_stream"]["width"]
             hdmi_height = config["hdmi_stream"]["height"]
             self._hdmi_shape = (hdmi_height, hdmi_width, 3)
-            sub_channels.append(REDIS_KEYS.SYS_HDMI_CHANNEL)
+            self._sub_channels.append(REDIS_KEYS.SYS_HDMI_CHANNEL.value)
         else:
             setup_hdmi_input = False
             self._hdmi_shape = None
@@ -112,7 +122,7 @@ class Application(object):
             self._out_transition = config["output_stream"].get("transition", False)
             self._out_preview = config["output_stream"].get("preview", False)
             subtopic = config["output_stream"].get("subtopic")
-            sub_channels.append(REDIS_KEYS.SYS_OUTPUT_CHANNEL)
+            self._sub_channels.append(REDIS_KEYS.SYS_OUTPUT_CHANNEL.value)
         else:
             setup_output = False
             subtopic = None
@@ -127,7 +137,7 @@ class Application(object):
             self._app_rkey = self.name
             if subtopic is not None:
                 self._app_rkey += ":" + subtopic
-            sub_channels.append(REDIS_KEYS.APP_CHANNEL.value + self._app_rkey)
+            self._sub_channels.append(REDIS_KEYS.APP_CHANNEL.value + self._app_rkey)
         else:
             self._app_rkey = None
 
@@ -143,21 +153,47 @@ class Application(object):
         if setup_output:
             self.setup_output()
 
-        self._cb_app_heartbeat = None
         self._scheduled_functions = {}
 
+    async def setup_redis(self):
+        self._cb_app_heartbeat = None
         self._redis_sub_callback = None
-        use_redis = True
-        if "redis" in config:
-            use_redis = config["redis"].get("enabled", True)
-        if not use_redis:
+
+        config = self.config.get("redis", {})
+
+        if config.get("enabled", True) == False:
             self._red = None
             self._red_sub = None
-        else:
-            self._setup_redis(sub_channels)
+            return
 
-        self._loop = asyncio.get_event_loop()
+        host = config.get("host", "localhost")
+        port = config.get("port", 6379)
+        db = config.get("db", None)
+        pwd = config.get("auth", None)
+        channels = self._sub_channels
 
+        # Keep one redis connection for regular commands.
+        self._red = await ReconnectingRedis(
+            suffix=None,
+            host=host,
+            port=port,
+            db=db,
+            password=pwd,
+            retry_on_timeout=True)
+
+
+        # And another redis connection for pubsub.
+        self._red_sub = await ReconnectingRedis(
+            suffix=None,
+            host=host,
+            port=port,
+            db=db,
+            password=pwd,
+            retry_on_timeout=True)
+
+        if channels:
+            self._loop.create_task(self._red_sub.subscribe(self._on_redis_message , *channels))
+            # self.add_periodic_callback(wait_for_redis_message, 0.01, True)
 
     def setup_input(
         self, cfg="input_stream", topic=INPUT_STREAM, bind=False, watermark=0
@@ -205,14 +241,14 @@ class Application(object):
 
     def _input_callback_output_stream(self, msg):
         cb = self._input_callback.get("output_stream")
-        if cb is None:
+        if cb is None or msg is None:
             return
 
         if len(msg) != 3:
             self._log.error("expected output message of size %d, got %d", 3, len(msg))
             return
 
-        topic = msg[0].bytes
+        topic = msg[0].bytes.decode('UTF-8')
         subtopic = topic.split(":", 1)[1].rstrip(b"\x00") if ":" in topic else None
         frame_num = struct.unpack("i", msg[1])[0]
         binimage_frame = msg[2]
@@ -359,7 +395,7 @@ class Application(object):
         if not self._red:
             raise Exception("redis not enabled")
         self._log.debug("Redis outgoing, channel: %s, data: %s", channel, data)
-        return await self._red.publish(channel, json.dumps(data))
+        return await self._red.pubsub.publish(channel, json.dumps(data))
 
     def set_redis_callback(self, function):
         """
@@ -376,7 +412,7 @@ class Application(object):
         The returned key can be used with stop_periodic_callback to stop
         the scheduling.
         """
-        periodic = self.ScheduledFunction(function, float_sec, True, self._loop)
+        periodic = ScheduledFunction(function, float_sec, True, self._loop, self)
         key = id(periodic)
         self._scheduled_functions[key] = periodic
         if start:
@@ -397,7 +433,7 @@ class Application(object):
         The returned handle can be used with cancel_call_later to cancel the
         future call.
         """
-        func = self.ScheduledFunction(function, float_sec, False, self._loop)
+        func = ScheduledFunction(function, float_sec, False, self._loop, self)
         func.start()
         return func
 
@@ -414,7 +450,7 @@ class Application(object):
         """
         self._loop.stop()
 
-    def run(self):
+    async def run(self):
         """
         Start the registered callbacks and the event loop.
         If a name was specified, the app will be registered on
@@ -427,10 +463,9 @@ class Application(object):
             if not pf.started:
                 pf.start()
         tasks = [x.get_task() for x in self._scheduled_functions.values()]
-        group = asyncio.gather(*tasks)
-        self._loop.run_until_complete(group)
+        await asyncio.gather(*tasks)
 
-    def cleanup(self):
+    async def cleanup(self):
         """
         Call this before quitting to stop registered callbacks and
         unregister the app from redis.
@@ -439,58 +474,47 @@ class Application(object):
             pf.stop()
         if self._cb_app_heartbeat:
             self._cb_app_heartbeat.stop()
-        # TODO see what's happening here
-        # if self.name and self._red is not None:
+        if self.name and self._red is not None:
             # Unregister app from redis.
-            # self._red.hdel(REDIS_KEYS.APPS, self._app_rkey)
+            # await self._red.hdel(REDIS_KEYS.APPS.value, self._app_rkey)
+            await self._red.disconnect()
+            self._red.close()
+            await self._red_sub.disconnect()
+            self._red_sub.close()
 
-    async def _app_heartbeat(self):
+    async def _app_heartbeat(self, app):
         # Update register on redis to indicate that the app is running well.
         self.config["timestamp"] = time.time()
         try:
-            self._red.hset(REDIS_KEYS.APPS, self._app_rkey, json.dumps(self.config))
+            await self._red.hset(REDIS_KEYS.APPS.value, self._app_rkey, json.dumps(self.config))
         except:
-            self._log.error("No redis configuration was found") 
-
-    def _setup_redis(self, channels: List[str]):
-        config = self.config.get("redis", {})
-        host = config.get("host", "localhost")
-        port = config.get("port", 6379)
-
-        # Keep one redis connection for regular commands.
-        self._red = redis.Redis(
-            host=host,
-            port=port)
-        # TODO(sebschlo) replace `callback=self._on_redis_connect`
-
-        # And another redis connection for pubsub.
-        self._red_sub = redis.Redis(
-            host=host,
-            port=port)
-        # TODO(sebschlo) replace callback=functools.partial(self._on_redis_connect, sub_channels=channels)
+            self._log.error("No redis configuration was found")
 
     def _on_redis_message(self, msg):
         if msg is None:
             return
-        msg_type, msg_channel, content = msg
+        msg_type = msg["type"]
+        msg_channel = msg["channel"]
+        content = msg["data"]
+
+        self._log.debug("Redis incoming, type: %s, channel: %s, msg: %s", msg_type, msg_channel, content)
+
         if msg_type != "message":
             return
 
-        self._log.debug("Redis incoming, channel: %s, msg: %s", msg_channel, content)
-
         data = json.loads(content)
-        if msg_channel.startswith(REDIS_KEYS.APP_CHANNEL):
+        if msg_channel.startswith(REDIS_KEYS.APP_CHANNEL.value):
             # Update app settings.
             _update_settings(self.config["settings"], data)
             self._app_heartbeat()
-        elif msg_channel == REDIS_KEYS.SYS_INPUT_CHANNEL:
+        elif msg_channel == REDIS_KEYS.SYS_INPUT_CHANNEL.value:
             # Input stream update.
             _update_settings(self.config["input_stream"], data)
             input_height = self.config["input_stream"]["height"]
             input_width = self.config["input_stream"]["width"]
             self._bgr_shape = (input_height, input_width, 3)
             self._depth_shape = (input_height, input_width)
-        elif msg_channel == REDIS_KEYS.SYS_OUTPUT_CHANNEL:
+        elif msg_channel == REDIS_KEYS.SYS_OUTPUT_CHANNEL.value:
             # Output stream update.
             _update_settings(self.config["output_stream"], data)
             self._bin_shape = (
@@ -501,53 +525,6 @@ class Application(object):
         if self._redis_sub_callback:
             self._log.debug("Redis sub callback")
             self._redis_sub_callback(app=self, channel=msg_channel, update=data)
-
-    def _on_redis_connect(self, sub_channels=None):
-        if "redis" in self.config:
-            db = self.config["redis"].get("db")
-            if db:
-                self._red.select(db)
-            pwd = self.config["redis"].get("auth")
-            if pwd:
-                self._red.auth(pwd)
-
-        if sub_channels:
-            self._red_sub.subscribe(sub_channels, self._on_redis_message)
-
-    class ScheduledFunction:
-        def __init__(self, function, delay, periodic, loop):
-            self.delay = delay
-            self.function = function
-            self.periodic = periodic
-            self.started = False
-            self._loop = loop
-            self._task = None
-
-        def get_task(self):
-            return self._task
-
-        def start(self):
-            if not self.started:
-                self.started = True
-                try:
-                    self._task = self._loop.create_task(self._run())
-                except asyncio.CancelledError:
-                    pass
-
-        def stop(self):
-            if self.started:
-                self.started = False
-                self._task.cancel()
-
-        async def _run(self):
-            if self.periodic == True:
-                while True:
-                    await asyncio.gather(
-                        asyncio.sleep(self.delay),
-                        self.function(),
-                    )
-            else:
-                self._loop.call_later(self.delay, self.function)
 
 
 def _update_settings(settings, new):

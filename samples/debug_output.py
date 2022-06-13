@@ -1,3 +1,4 @@
+import asyncio
 import cv2
 import numpy
 
@@ -23,19 +24,21 @@ def process_frame(app, subtopic, frame_num, bin_image):
     cv2.waitKey(10)
 
 
-def main():
+async def main():
     app = Application("preview", 'sample_config.json',
-            setup_input=False, setup_output=False, verbose=True)
+                        setup_input=False, setup_output=False, verbose=True)
+    await app.setup_redis()
     app.config['settings'] = {'scale': 2, 'kron': False}
     app.setup_input('output_stream', OUTPUT_STREAM, bind=False)
     app.set_input_callback(process_frame, 'output_stream')
-    try:
-        app.run()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        app.cleanup()
 
+    try:
+        await app.run()
+    finally:
+        await app.cleanup()
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass

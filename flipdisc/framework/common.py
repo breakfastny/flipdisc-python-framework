@@ -1,4 +1,5 @@
 import enum
+import asyncio
 
 class REDIS_KEYS(enum.Enum):
     # hashtable used to store all active apps.
@@ -18,3 +19,40 @@ INPUT_STREAM = "IN_STREAM"
 HDMI_INPUT_STREAM = "HDMI_STREAM"
 
 OUTPUT_STREAM = "OUT_STREAM"
+
+
+class ScheduledFunction:
+    def __init__(self, function, delay, periodic, loop, *args):
+        self.delay = delay
+        self.function = function
+        self.periodic = periodic
+        self.started = False
+        self._loop = loop
+        self._args = args
+        self._task = None
+
+    def get_task(self):
+        return self._task
+
+    def start(self):
+        if not self.started:
+            self.started = True
+            try:
+                self._task = self._loop.create_task(self._run())
+            except asyncio.CancelledError:
+                pass
+
+    def stop(self):
+        if self.started:
+            self.started = False
+            self._task.cancel()
+
+    async def _run(self):
+        if self.periodic == True:
+            while True:
+                await asyncio.gather(
+                    asyncio.sleep(self.delay),
+                    self.function(*self._args),
+                )
+        else:
+            self._loop.call_later(self.delay, self.function)
