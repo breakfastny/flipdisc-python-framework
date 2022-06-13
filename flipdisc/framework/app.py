@@ -13,6 +13,9 @@ import zmq.asyncio
 import zmq.eventloop.zmqstream
 
 import redis.asyncio.client as rc
+import redis.asyncio
+import redis.retry
+import redis.backoff
 
 #TODO remove
 import datetime
@@ -158,6 +161,8 @@ class Application(object):
     async def setup_redis(self):
         self._cb_app_heartbeat = None
         self._redis_sub_callback = None
+        self._red = None
+        self._pubsub = None
 
         config = self.config.get("redis", {})
 
@@ -173,7 +178,7 @@ class Application(object):
         channels = self._sub_channels
 
         # Keep one redis connection for regular commands.
-        self._red = await ReconnectingRedis(
+        self._red = ReconnectingRedis(
             suffix=None,
             host=host,
             port=port,
@@ -183,7 +188,7 @@ class Application(object):
 
 
         # And another redis connection for pubsub.
-        self._red_sub = await ReconnectingRedis(
+        self._red_sub = ReconnectingRedis(
             suffix=None,
             host=host,
             port=port,
@@ -191,9 +196,16 @@ class Application(object):
             password=pwd,
             retry_on_timeout=True)
 
+        async def wait_for_redis_message(app: "Application"):
+            pubsub = app._pubsub
+            msg = await pubsub.get_message(ignore_subscribe_messages=False)
+            if msg is not None:
+                self._on_redis_message(msg)
+
         if channels:
             self._loop.create_task(self._red_sub.subscribe(self._on_redis_message , *channels))
-            # self.add_periodic_callback(wait_for_redis_message, 0.01, True)
+            await self._pubsub.subscribe(*channels)
+
 
     def setup_input(
         self, cfg="input_stream", topic=INPUT_STREAM, bind=False, watermark=0
@@ -241,17 +253,19 @@ class Application(object):
 
     def _input_callback_output_stream(self, msg):
         cb = self._input_callback.get("output_stream")
+        res = msg.result()
+
         if cb is None or msg is None:
             return
 
-        if len(msg) != 3:
+        if len(res) != 3:
             self._log.error("expected output message of size %d, got %d", 3, len(msg))
             return
 
         topic = msg[0].bytes.decode('UTF-8')
         subtopic = topic.split(":", 1)[1].rstrip(b"\x00") if ":" in topic else None
-        frame_num = struct.unpack("i", msg[1])[0]
-        binimage_frame = msg[2]
+        frame_num = struct.unpack("i", res[1])[0]
+        binimage_frame = res[2]
 
         bin_image = numpy.frombuffer(binimage_frame.bytes, dtype=self._bin_dtype)
         try:
@@ -475,11 +489,9 @@ class Application(object):
         if self._cb_app_heartbeat:
             self._cb_app_heartbeat.stop()
         if self.name and self._red is not None:
-            # Unregister app from redis.
-            # await self._red.hdel(REDIS_KEYS.APPS.value, self._app_rkey)
-            await self._red.disconnect()
+            # Unregister app from redis.            
+            await self._red.hdel(REDIS_KEYS.APPS.value, self.
             self._red.close()
-            await self._red_sub.disconnect()
             self._red_sub.close()
 
     async def _app_heartbeat(self, app):
