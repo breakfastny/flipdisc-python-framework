@@ -15,12 +15,9 @@ import redis.asyncio
 import redis.retry
 import redis.backoff
 
-#TODO remove
-import datetime
-
 from .common import REDIS_KEYS, INPUT_STREAM, HDMI_INPUT_STREAM, OUTPUT_STREAM
 
-from typing import List
+from typing import Callable, List
 
 __all__ = ["Application"]
 
@@ -28,13 +25,13 @@ __all__ = ["Application"]
 class Application(object):
     def __init__(
         self,
-        name,
-        config,
-        setup_input=True,
-        setup_output=True,
-        setup_hdmi_input=True,
-        verbose=False,
-    ):
+        name: str,
+        config: str,
+        setup_input: bool=True,
+        setup_output: bool=True,
+        setup_hdmi_input: bool=True,
+        verbose: bool=False,
+    ) -> None:
         """
         An user app instance.
 
@@ -202,8 +199,8 @@ class Application(object):
             self.add_periodic_callback(wait_for_redis_message, 0.01, True)
 
     def setup_input(
-        self, cfg="input_stream", topic=INPUT_STREAM, bind=False, watermark=0
-    ):
+        self, cfg: str="input_stream", topic: str=INPUT_STREAM, bind: bool=False, watermark: int=0
+    ) -> None:
         """
         Configure a ZMQ PUB socket for the input stream.
         """
@@ -227,7 +224,7 @@ class Application(object):
         if callback is None:
             raise Exception("Implementation not available for %s configuration" % cfg)
 
-        async def receive_stream(socket, callback):
+        async def receive_stream(socket: zmq.asyncio.Socket, callback: Callable):
             while True:
                 try:
                     msg = await socket.recv_multipart()
@@ -246,14 +243,14 @@ class Application(object):
         )
 
 
-    def set_input_callback(self, function, stream="input_stream"):
+    def set_input_callback(self, function: Callable, stream: str="input_stream") -> None:
         """
         Define a callback to be invoked on messages received through
         the socket configured with setup_input.
         """
         self._input_callback[stream] = function
 
-    def _input_callback_output_stream(self, msg):
+    def _input_callback_output_stream(self, msg: List[bytes]) -> None:
         cb = self._input_callback.get("output_stream")
 
         if cb is None or msg is None:
@@ -280,7 +277,7 @@ class Application(object):
     # Preview stream is processed the same way as the output stream.
     _input_callback_preview_stream = _input_callback_output_stream
 
-    def _input_callback_input_transition_stream(self, msg):
+    def _input_callback_input_transition_stream(self, msg: List[bytes]):
         cb = self._input_callback.get("transition_stream")
         if cb is None:
             return
@@ -305,7 +302,7 @@ class Application(object):
 
         cb(app=self, frame_from=app_name, frame_num=frame_num, bin_image=bin_image)
 
-    def _input_callback_input_stream(self, msg):
+    def _input_callback_input_stream(self, msg: List[bytes]):
         cb = self._input_callback.get("input_stream")
         if cb is None:
             return
@@ -330,7 +327,7 @@ class Application(object):
 
         cb(app=self, frame_num=frame_num, depth=depth, bgr=bgr)
 
-    def _input_callback_hdmi_stream(self, msg):
+    def _input_callback_hdmi_stream(self, msg: List[bytes]):
         cb = self._input_callback.get("hdmi_stream")
         if cb is None:
             return
@@ -351,7 +348,7 @@ class Application(object):
 
         cb(app=self, frame_num=frame_num, bgr=bgr)
 
-    def setup_output(self, cfg="output_stream", bind=None):
+    def setup_output(self, cfg: str="output_stream", bind: any=None) -> None:
         """
         Configure a ZMQ PUB socket for the output stream.
         """
@@ -378,7 +375,7 @@ class Application(object):
             self._out_topic,
         )
 
-    async def send_output(self, result, topic=None) -> int:
+    async def send_output(self, result: numpy.ndarray, topic: str=None) -> int:
         """
         Publish result using the output socket configured by setup_output.
 
@@ -412,14 +409,14 @@ class Application(object):
         self._log.debug("Redis outgoing, channel: %s, data: %s", channel, data)
         return await self._red.publish(channel, json.dumps(data))
 
-    def set_redis_callback(self, function):
+    def set_redis_callback(self, function: Callable):
         """
         Define a callback to be invoked on messages received through
         the redis pubsub.
         """
         self._redis_sub_callback = function
 
-    def add_periodic_callback(self, function, float_sec, start=False):
+    def add_periodic_callback(self, function: Callable, float_sec: float, start: bool=False) -> int:
         """
         Schedule function to be called once each n seconds. The callback
         will receive this instance as its sole argument.
@@ -434,14 +431,14 @@ class Application(object):
             periodic.start()
         return key
 
-    def stop_periodic_callback(self, key):
+    def stop_periodic_callback(self, key: str):
         """
         Stop a periodic callback created with add_periodic_callback.
         """
         periodic = self._scheduled_functions.pop(key)
         periodic.stop()
 
-    def call_later(self, float_sec, function, *args, **kwargs):
+    async def call_later(self, float_sec: float, function: Callable):
         """
         Schedule function to be called after float_sec seconds have passed.
 
@@ -480,7 +477,7 @@ class Application(object):
         tasks = [x.get_task() for x in self._scheduled_functions.values()]
         await asyncio.gather(*tasks)
 
-    async def cleanup(self):
+    async def cleanup(self) -> None:
         """
         Call this before quitting to stop registered callbacks and
         unregister the app from redis.
@@ -496,7 +493,7 @@ class Application(object):
             await self._pubsub.punsubscribe('*')
             await self._red.hdel(REDIS_KEYS.APPS.value, self._app_rkey)
 
-    async def _app_heartbeat(self, app):
+    async def _app_heartbeat(self, app: "Application") -> None:
         # Update register on redis to indicate that the app is running well.
         self.config["timestamp"] = time.time()
         try:
@@ -541,7 +538,7 @@ class Application(object):
             self._redis_sub_callback(app=self, channel=msg_channel, update=data)
 
     class ScheduledFunction:
-        def __init__(self, function, delay, periodic, loop, app):
+        def __init__(self, function: Callable, delay: float, periodic: bool, loop: asyncio.AbstractEventLoop, app: "Application"):
             self.delay = delay
             self.function = function
             self.periodic = periodic
