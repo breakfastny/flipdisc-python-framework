@@ -3,24 +3,15 @@ import json
 import struct
 import logging
 import logging.config
-import collections
 import asyncio
 import numpy
+import collections
+import time
 from redis import RedisError
 
 import zmq.asyncio
-import redis
 
-import redis.asyncio.client as rc
-import redis.asyncio
-import redis.retry
-import redis.backoff
-
-#TODO remove
-import datetime
-
-from flipdisc.framework.red import ReconnectingRedis
-
+from .red import ReconnectingRedis
 from .common import REDIS_KEYS, INPUT_STREAM, HDMI_INPUT_STREAM, OUTPUT_STREAM
 from .common import ScheduledFunction
 
@@ -196,15 +187,8 @@ class Application(object):
             password=pwd,
             retry_on_timeout=True)
 
-        async def wait_for_redis_message(app: "Application"):
-            pubsub = app._pubsub
-            msg = await pubsub.get_message(ignore_subscribe_messages=False)
-            if msg is not None:
-                self._on_redis_message(msg)
-
         if channels:
             self._loop.create_task(self._red_sub.subscribe(self._on_redis_message , *channels))
-            await self._pubsub.subscribe(*channels)
 
 
     def setup_input(
@@ -499,7 +483,7 @@ class Application(object):
             self._cb_app_heartbeat.stop()
         if self.name and self._red is not None:
             # Unregister app from redis.            
-            await self._red.hdel(REDIS_KEYS.APPS.value, self.
+            await self._red.hdel(REDIS_KEYS.APPS.value, self._app_rkey)
             self._red.close()
             self._red_sub.close()
 
