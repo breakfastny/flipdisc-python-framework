@@ -8,7 +8,7 @@
     "system": {
         "name": "noise",
         "entrypoint": "noise.py",
-        "execution_profile": "python"
+        "execution_profile": "python3"
     },
     "settings": [
         {
