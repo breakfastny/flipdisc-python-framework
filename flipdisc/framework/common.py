@@ -1,5 +1,6 @@
 import enum
 import asyncio
+from typing import Callable, Iterable
 
 class REDIS_KEYS(enum.Enum):
     # hashtable used to store all active apps.
@@ -22,7 +23,7 @@ OUTPUT_STREAM = "OUT_STREAM"
 
 
 class ScheduledFunction:
-    def __init__(self, function, delay, periodic, loop, *args):
+    def __init__(self, function: Callable, args: Iterable, delay: float, periodic: bool=False, loop=asyncio.AbstractEventLoop):
         self.delay = delay
         self.function = function
         self.periodic = periodic

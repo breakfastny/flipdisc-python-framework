@@ -15,7 +15,7 @@ from .red import ReconnectingRedis
 from .common import REDIS_KEYS, INPUT_STREAM, HDMI_INPUT_STREAM, OUTPUT_STREAM
 from .common import ScheduledFunction
 
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 __all__ = ["Application"]
 
@@ -224,8 +224,7 @@ class Application(object):
                     callback(msg)
                 except:
                     self._log.error('Error waiting for ZMQ stream message')
-                    pass
-        
+
         self._in_stream[cfg] = self._loop.create_task(receive_stream(in_socket, callback))
 
         self._log.debug(
@@ -341,7 +340,7 @@ class Application(object):
 
         cb(app=self, frame_num=frame_num, bgr=bgr)
 
-    def setup_output(self, cfg: str="output_stream", bind: any=None) -> None:
+    def setup_output(self, cfg: str="output_stream", bind: Optional[bool]=None) -> None:
         """
         Configure a ZMQ PUB socket for the output stream.
         """
@@ -368,7 +367,7 @@ class Application(object):
             self._out_topic,
         )
 
-    async def send_output(self, result: numpy.ndarray, topic: str=None) -> int:
+    async def send_output(self, result: numpy.ndarray, topic: Optional[str]=None) -> int:
         """
         Publish result using the output socket configured by setup_output.
 
@@ -417,7 +416,7 @@ class Application(object):
         The returned key can be used with stop_periodic_callback to stop
         the scheduling.
         """
-        periodic = ScheduledFunction(function, float_sec, True, self._loop, self)
+        periodic = ScheduledFunction(function, [self], float_sec, periodic=True, loop=self._loop)
         key = id(periodic)
         self._scheduled_functions[key] = periodic
         if start:
@@ -438,7 +437,7 @@ class Application(object):
         The returned handle can be used with cancel_call_later to cancel the
         future call.
         """
-        func = ScheduledFunction(function, float_sec, False, self._loop, self)
+        func = ScheduledFunction(function, [self], float_sec, False, self._loop)
         func.start()
         return func
 
