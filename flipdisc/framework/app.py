@@ -3,16 +3,19 @@ import json
 import struct
 import logging
 import logging.config
-import collections
-import functools
-
+import asyncio
 import numpy
+import collections
+import time
+from redis import RedisError
+
 import zmq.asyncio
 
-import redis
+from .red import ReconnectingRedis
 from .common import REDIS_KEYS, INPUT_STREAM, HDMI_INPUT_STREAM, OUTPUT_STREAM
+from .common import ScheduledFunction
 
-from typing import List
+from typing import Callable, List, Optional
 
 __all__ = ["Application"]
 
@@ -20,13 +23,13 @@ __all__ = ["Application"]
 class Application(object):
     def __init__(
         self,
-        name,
-        config,
-        setup_input=True,
-        setup_output=True,
-        setup_hdmi_input=True,
-        verbose=False,
-    ):
+        name: str,
+        config: str,
+        setup_input: bool = True,
+        setup_output: bool = True,
+        setup_hdmi_input: bool = True,
+        verbose: bool = False,
+    ) -> None:
         """
         An user app instance.
 
@@ -75,17 +78,22 @@ class Application(object):
 
         self._log = logging.getLogger(__name__)
 
+        self._loop = asyncio.get_event_loop()
+        self._cb_app_heartbeat = None
+        self._scheduled_functions = {}
+
         # List of redis channels to subscribe.
-        sub_channels = []
+        self._sub_channels = []
 
         self._input_callback = {}
+        self._loop = asyncio.get_event_loop()
 
         if "input_stream" in config:
             input_width = config["input_stream"]["width"]
             input_height = config["input_stream"]["height"]
             self._bgr_shape = (input_height, input_width, 3)
             self._depth_shape = (input_height, input_width)
-            sub_channels.append(REDIS_KEYS.SYS_INPUT_CHANNEL)
+            self._sub_channels.append(REDIS_KEYS.SYS_INPUT_CHANNEL.value)
         else:
             setup_input = False
             self._bgr_shape = None
@@ -95,7 +103,7 @@ class Application(object):
             hdmi_width = config["hdmi_stream"]["width"]
             hdmi_height = config["hdmi_stream"]["height"]
             self._hdmi_shape = (hdmi_height, hdmi_width, 3)
-            sub_channels.append(REDIS_KEYS.SYS_HDMI_CHANNEL)
+            self._sub_channels.append(REDIS_KEYS.SYS_HDMI_CHANNEL.value)
         else:
             setup_hdmi_input = False
             self._hdmi_shape = None
@@ -111,7 +119,7 @@ class Application(object):
             self._out_transition = config["output_stream"].get("transition", False)
             self._out_preview = config["output_stream"].get("preview", False)
             subtopic = config["output_stream"].get("subtopic")
-            sub_channels.append(REDIS_KEYS.SYS_OUTPUT_CHANNEL)
+            self._sub_channels.append(REDIS_KEYS.SYS_OUTPUT_CHANNEL.value)
         else:
             setup_output = False
             subtopic = None
@@ -123,10 +131,10 @@ class Application(object):
             raise ValueError("App name is required to use transitions")
 
         if self.name:
-            self._app_rkey = self.name + subtopic
+            self._app_rkey = self.name
             if subtopic is not None:
                 self._app_rkey += ":" + subtopic
-            sub_channels.append(REDIS_KEYS.APP_CHANNEL + self._app_rkey)
+            self._sub_channels.append(REDIS_KEYS.APP_CHANNEL.value + self._app_rkey)
         else:
             self._app_rkey = None
 
@@ -142,25 +150,57 @@ class Application(object):
         if setup_output:
             self.setup_output()
 
+    async def setup_redis(self):
         self._cb_app_heartbeat = None
-        self._periodic_callbacks = {}
-
         self._redis_sub_callback = None
-        use_redis = True
-        if "redis" in config:
-            use_redis = config["redis"].get("enabled", True)
-        if not use_redis:
+        self._red = None
+        self._pubsub = None
+
+        config = self.config.get("redis", {})
+
+        if config.get("enabled", True) == False:
             self._red = None
             self._red_sub = None
-        else:
-            self._red = redis.Redis()
-            self._red_sub = redis.Redis()
-            self._setup_redis(sub_channels)
+            return
 
+        host = config.get("host", "localhost")
+        port = config.get("port", 6379)
+        db = config.get("db", None)
+        pwd = config.get("auth", None)
+        channels = self._sub_channels
+
+        # Keep one redis connection for regular commands.
+        self._red = ReconnectingRedis(
+            suffix=None,
+            host=host,
+            port=port,
+            db=db,
+            password=pwd,
+            retry_on_timeout=True,
+        )
+
+        # And another redis connection for pubsub.
+        self._red_sub = ReconnectingRedis(
+            suffix=None,
+            host=host,
+            port=port,
+            db=db,
+            password=pwd,
+            retry_on_timeout=True,
+        )
+
+        if channels:
+            self._loop.create_task(
+                self._red_sub.subscribe(self._on_redis_message, *channels)
+            )
 
     def setup_input(
-        self, cfg="input_stream", topic=INPUT_STREAM, bind=False, watermark=0
-    ):
+        self,
+        cfg: str = "input_stream",
+        topic: str = INPUT_STREAM,
+        bind: bool = False,
+        watermark: int = 0,
+    ) -> None:
         """
         Configure a ZMQ PUB socket for the input stream.
         """
@@ -170,7 +210,7 @@ class Application(object):
 
         sock_address = self.config[cfg]["socket"]
         in_socket = self._ctx.socket(zmq.SUB)
-        in_socket.setsockopt(zmq.SUBSCRIBE, topic)
+        in_socket.setsockopt_string(zmq.SUBSCRIBE, topic)
         if watermark > 0:
             in_socket.set_hwm(watermark)
 
@@ -179,14 +219,22 @@ class Application(object):
         else:
             in_socket.connect(sock_address)
 
-        # TODO(wrigby) Replace ZMQStream with asyncio
-        self._in_stream[cfg] = zmqstream.ZMQStream(in_socket)
-
         # TODO(wrigby): This is quite hacky - we shouldn't be doing this
         callback = getattr(self, "_input_callback_%s" % cfg, None)
         if callback is None:
             raise Exception("Implementation not available for %s configuration" % cfg)
-        self._in_stream[cfg].on_recv(callback, copy=False)
+
+        async def receive_stream(socket: zmq.asyncio.Socket, callback: Callable):
+            while True:
+                try:
+                    msg = await socket.recv_multipart()
+                    callback(msg)
+                except:
+                    self._log.error("Error waiting for ZMQ stream message")
+
+        self._in_stream[cfg] = self._loop.create_task(
+            receive_stream(in_socket, callback)
+        )
 
         self._log.debug(
             "SUB socket %s to %s, topic %s",
@@ -195,28 +243,31 @@ class Application(object):
             topic,
         )
 
-    def set_input_callback(self, function, stream="input_stream"):
+    def set_input_callback(
+        self, function: Callable, stream: str = "input_stream"
+    ) -> None:
         """
         Define a callback to be invoked on messages received through
         the socket configured with setup_input.
         """
         self._input_callback[stream] = function
 
-    def _input_callback_output_stream(self, msg):
+    def _input_callback_output_stream(self, msg: List[bytes]) -> None:
         cb = self._input_callback.get("output_stream")
-        if cb is None:
+
+        if cb is None or msg is None:
             return
 
         if len(msg) != 3:
             self._log.error("expected output message of size %d, got %d", 3, len(msg))
             return
 
-        topic = msg[0].bytes
+        topic = msg[0].decode("UTF-8")
         subtopic = topic.split(":", 1)[1].rstrip(b"\x00") if ":" in topic else None
         frame_num = struct.unpack("i", msg[1])[0]
         binimage_frame = msg[2]
 
-        bin_image = numpy.frombuffer(binimage_frame.bytes, dtype=self._bin_dtype)
+        bin_image = numpy.frombuffer(binimage_frame, dtype=self._bin_dtype)
         try:
             bin_image = bin_image.reshape(self._bin_shape)
         except ValueError:
@@ -228,7 +279,7 @@ class Application(object):
     # Preview stream is processed the same way as the output stream.
     _input_callback_preview_stream = _input_callback_output_stream
 
-    def _input_callback_input_transition_stream(self, msg):
+    def _input_callback_input_transition_stream(self, msg: List[bytes]):
         cb = self._input_callback.get("transition_stream")
         if cb is None:
             return
@@ -244,7 +295,7 @@ class Application(object):
         frame_num = struct.unpack("i", msg[2])[0]
         binimage_frame = msg[3]
 
-        bin_image = numpy.frombuffer(binimage_frame.bytes, dtype=self._bin_dtype)
+        bin_image = numpy.frombuffer(binimage_frame, dtype=self._bin_dtype)
         try:
             bin_image = bin_image.reshape(self._bin_shape)
         except ValueError:
@@ -253,7 +304,7 @@ class Application(object):
 
         cb(app=self, frame_from=app_name, frame_num=frame_num, bin_image=bin_image)
 
-    def _input_callback_input_stream(self, msg):
+    def _input_callback_input_stream(self, msg: List[bytes]):
         cb = self._input_callback.get("input_stream")
         if cb is None:
             return
@@ -267,8 +318,8 @@ class Application(object):
         depth_frame = msg[2]
         bgr_frame = msg[3]
 
-        depth = numpy.frombuffer(depth_frame.bytes, dtype=self._depth_dtype)
-        bgr = numpy.frombuffer(bgr_frame.bytes, dtype=self._bgr_dtype)
+        depth = numpy.frombuffer(depth_frame, dtype=self._depth_dtype)
+        bgr = numpy.frombuffer(bgr_frame, dtype=self._bgr_dtype)
         try:
             depth = depth.reshape(self._depth_shape)
             bgr = bgr.reshape(self._bgr_shape)
@@ -278,7 +329,7 @@ class Application(object):
 
         cb(app=self, frame_num=frame_num, depth=depth, bgr=bgr)
 
-    def _input_callback_hdmi_stream(self, msg):
+    def _input_callback_hdmi_stream(self, msg: List[bytes]):
         cb = self._input_callback.get("hdmi_stream")
         if cb is None:
             return
@@ -290,7 +341,7 @@ class Application(object):
         frame_num = struct.unpack("i", msg[1])[0]
         bgr_frame = msg[2]
 
-        bgr = numpy.frombuffer(bgr_frame.bytes, dtype=self._hdmi_dtype)
+        bgr = numpy.frombuffer(bgr_frame, dtype=self._hdmi_dtype)
         try:
             bgr = bgr.reshape(self._hdmi_shape)
         except ValueError:
@@ -299,7 +350,9 @@ class Application(object):
 
         cb(app=self, frame_num=frame_num, bgr=bgr)
 
-    def setup_output(self, cfg="output_stream", bind=None):
+    def setup_output(
+        self, cfg: str = "output_stream", bind: Optional[bool] = None
+    ) -> None:
         """
         Configure a ZMQ PUB socket for the output stream.
         """
@@ -311,7 +364,7 @@ class Application(object):
         subtopic = ":%s" % subtopic if subtopic else ""
 
         self._out_socket = self._ctx.socket(zmq.PUB)
-        self._out_topic = bytes(OUTPUT_STREAM + subtopic)
+        self._out_topic = bytes(OUTPUT_STREAM + subtopic, encoding="utf8")
         if bind is None:
             bind = (not self._out_transition) and (not self._out_preview)
         if bind:
@@ -326,7 +379,9 @@ class Application(object):
             self._out_topic,
         )
 
-    async def send_output(self, result, topic=None) -> int:
+    async def send_output(
+        self, result: numpy.ndarray, topic: Optional[str] = None
+    ) -> int:
         """
         Publish result using the output socket configured by setup_output.
 
@@ -358,16 +413,18 @@ class Application(object):
         if not self._red:
             raise Exception("redis not enabled")
         self._log.debug("Redis outgoing, channel: %s, data: %s", channel, data)
-        return await self._red.publish(channel, json.dumps(data))
+        return await self._red.pubsub.publish(channel, json.dumps(data))
 
-    def set_redis_callback(self, function):
+    def set_redis_callback(self, function: Callable):
         """
         Define a callback to be invoked on messages received through
         the redis pubsub.
         """
         self._redis_sub_callback = function
 
-    def add_periodic_callback(self, function, float_sec, start=False):
+    def add_periodic_callback(
+        self, function: Callable, float_sec: float, start: bool = False
+    ) -> int:
         """
         Schedule function to be called once each n seconds. The callback
         will receive this instance as its sole argument.
@@ -375,117 +432,118 @@ class Application(object):
         The returned key can be used with stop_periodic_callback to stop
         the scheduling.
         """
-        cb = ioloop.PeriodicCallback(
-            lambda: function(self), float_sec * 1000
-        )  # convert to ms
-        key = id(cb)
-        self._periodic_callbacks[key] = cb
+        periodic = ScheduledFunction(
+           float_sec, function, [self], periodic=True, loop=self._loop
+        )
+        key = id(periodic)
+        self._scheduled_functions[key] = periodic
         if start:
-            cb.start()
+            periodic.start()
         return key
 
-    def stop_periodic_callback(self, key):
+    def stop_periodic_callback(self, key: str):
         """
         Stop a periodic callback created with add_periodic_callback.
         """
-        cb = self._periodic_callbacks.pop(key)
-        cb.stop()
+        periodic = self._scheduled_functions.pop(key)
+        periodic.stop()
 
-    def call_later(self, float_sec, function, *args, **kwargs):
+    async def call_later(self, float_sec: float, function: Callable):
         """
         Schedule function to be called after float_sec seconds have passed.
 
         The returned handle can be used with cancel_call_later to cancel the
         future call.
         """
-        handle = ioloop.IOLoop.current().call_later(
-            float_sec, function, *args, **kwargs
-        )
-        return handle
+        func = ScheduledFunction(float_sec, function, [self], False, self._loop)
+        func.start()
+        return func
 
     def cancel_call_later(self, handle):
         """
         Stop a scheduled call_later function from running.
         """
-        ioloop.IOLoop.current().remove_timeout(handle)
+        handle.stop()
 
     def stop_ioloop(self):
         """
         Stop the event loop.
         Note: call the cleanup function after this one if the app is quitting.
         """
-        ioloop.IOLoop.current().stop()
+        self._loop.stop()
 
-    def run(self):
+    async def run(self):
         """
         Start the registered callbacks and the event loop.
         If a name was specified, the app will be registered on
         redis if it's enabled.
         """
         if self.name and self._red is not None:
-            self._cb_app_heartbeat = ioloop.PeriodicCallback(self._app_heartbeat, 1000)
-            self._cb_app_heartbeat.start()
-        for cb in self._periodic_callbacks.values():
-            if not cb.is_running():
-                cb.start()
-        ioloop.IOLoop.current().start()
+            key = self.add_periodic_callback(self._app_heartbeat, 1, True)
+            self._cb_app_heartbeat = self._scheduled_functions[key]
+        for pf in self._scheduled_functions.values():
+            if not pf.started:
+                pf.start()
+        tasks = [x.get_task() for x in self._scheduled_functions.values()]
+        await asyncio.gather(*tasks)
 
-    def cleanup(self):
+    async def cleanup(self) -> None:
         """
         Call this before quitting to stop registered callbacks and
         unregister the app from redis.
         """
-        for cb in self._periodic_callbacks.values():
-            cb.stop()
+        for pf in self._scheduled_functions.values():
+            pf.stop()
+        for t in self._in_stream.values():
+            t.cancel()
         if self._cb_app_heartbeat:
             self._cb_app_heartbeat.stop()
         if self.name and self._red is not None:
             # Unregister app from redis.
-            self._red.hdel(REDIS_KEYS.APPS, self._app_rkey)
+            await self._red.hdel(REDIS_KEYS.APPS.value, self._app_rkey)
+            self._red.close()
+            self._red_sub.close()
 
-    def _app_heartbeat(self):
+    async def _app_heartbeat(self, app: "Application") -> None:
         # Update register on redis to indicate that the app is running well.
         self.config["timestamp"] = time.time()
-        if self._red.is_connected():
-            self._red.hset(REDIS_KEYS.APPS, self._app_rkey, json.dumps(self.config))
-
-    def _setup_redis(self, channels: List[str]):
-        config = self.config.get("redis", {})
-        host = config.get("host", "localhost")
-        port = config.get("port", 6379)
-
-        # Keep one redis connection for regular commands.
-        self._red.connect(host=host, port=port, callback=self._on_redis_connect)
-
-        # And another redis connection for pubsub.
-        self._red_sub.connect(
-            host=host,
-            port=port,
-            callback=functools.partial(self._on_redis_connect, sub_channels=channels),
-        )
+        try:
+            await self._red.hset(
+                REDIS_KEYS.APPS.value, self._app_rkey, json.dumps(self.config)
+            )
+        except:
+            self._log.error("No redis configuration was found")
 
     def _on_redis_message(self, msg):
         if msg is None:
             return
-        msg_type, msg_channel, content = msg
+        msg_type = msg["type"]
+        msg_channel = msg["channel"]
+        content = msg["data"]
+
+        self._log.debug(
+            "Redis incoming, type: %s, channel: %s, msg: %s",
+            msg_type,
+            msg_channel,
+            content,
+        )
+
         if msg_type != "message":
             return
 
-        self._log.debug("Redis incoming, channel: %s, msg: %s", msg_channel, content)
-
         data = json.loads(content)
-        if msg_channel.startswith(REDIS_KEYS.APP_CHANNEL):
+        if msg_channel.startswith(REDIS_KEYS.APP_CHANNEL.value):
             # Update app settings.
             _update_settings(self.config["settings"], data)
             self._app_heartbeat()
-        elif msg_channel == REDIS_KEYS.SYS_INPUT_CHANNEL:
+        elif msg_channel == REDIS_KEYS.SYS_INPUT_CHANNEL.value:
             # Input stream update.
             _update_settings(self.config["input_stream"], data)
             input_height = self.config["input_stream"]["height"]
             input_width = self.config["input_stream"]["width"]
             self._bgr_shape = (input_height, input_width, 3)
             self._depth_shape = (input_height, input_width)
-        elif msg_channel == REDIS_KEYS.SYS_OUTPUT_CHANNEL:
+        elif msg_channel == REDIS_KEYS.SYS_OUTPUT_CHANNEL.value:
             # Output stream update.
             _update_settings(self.config["output_stream"], data)
             self._bin_shape = (
@@ -496,18 +554,6 @@ class Application(object):
         if self._redis_sub_callback:
             self._log.debug("Redis sub callback")
             self._redis_sub_callback(app=self, channel=msg_channel, update=data)
-
-    def _on_redis_connect(self, sub_channels=None):
-        if "redis" in self.config:
-            db = self.config["redis"].get("db")
-            if db:
-                self._red.select(db)
-            pwd = self.config["redis"].get("auth")
-            if pwd:
-                self._red.auth(pwd)
-
-        if sub_channels:
-            self._red_sub.subscribe(sub_channels, self._on_redis_message)
 
 
 def _update_settings(settings, new):
