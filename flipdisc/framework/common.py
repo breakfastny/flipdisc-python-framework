@@ -6,16 +6,16 @@ from typing import Callable, Iterable, Optional
 class REDIS_KEYS(enum.Enum):
     # hashtable used to store all active apps.
     # key is an app name and the value is a json.dumps of all its settings.
-    APPS: str = "fd:apps"
+    APPS = "fd:apps"
     # channel name used to send messages to specific apps.
     # When subscribing, use it as APP_CHANNEL + appname.
-    APP_CHANNEL: str = "fd:app:"
+    APP_CHANNEL = "fd:app:"
     # channel name used to send messages to all apps that use input settings.
-    SYS_INPUT_CHANNEL: str = "fd:system:input"
+    SYS_INPUT_CHANNEL = "fd:system:input"
     # channel name used to send messages to all apps that use hdmi settings.
-    SYS_HDMI_CHANNEL: str = "fd:system:hdmi"
+    SYS_HDMI_CHANNEL = "fd:system:hdmi"
     # channel name used to send messages to all apps that use output settings.
-    SYS_OUTPUT_CHANNEL: str = "fd:system:output"
+    SYS_OUTPUT_CHANNEL = "fd:system:output"
 
 
 INPUT_STREAM = "IN_STREAM"
@@ -39,7 +39,7 @@ class ScheduledFunction:
         self.started = False
         self._loop = loop if loop is not None else asyncio.get_event_loop()
         self._args = args
-        self._task = None
+        self._task: Optional[asyncio.Task] = None
 
     def get_task(self):
         return self._task
@@ -53,7 +53,7 @@ class ScheduledFunction:
                 pass
 
     def stop(self):
-        if self.started:
+        if self.started and self._task is not None:
             self.started = False
             self._task.cancel()
 

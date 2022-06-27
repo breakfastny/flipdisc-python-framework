@@ -32,7 +32,9 @@ class ReconnectingRedis(redis.asyncio.Redis):
                 self._log.debug("%s connected", self._name)
 
                 while True:
-                    async for msg in self.psub.listen():
+                    # Type check complains about iterating over a Coroutine type, but this is how
+                    # the documentation indicates one should listen for messages.
+                    async for msg in self.psub.listen():  # type: ignore
                         callback(msg)
                     await asyncio.sleep(0.01)
 
