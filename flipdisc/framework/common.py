@@ -1,6 +1,7 @@
 import enum
 import asyncio
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Optional
+
 
 class REDIS_KEYS(enum.Enum):
     # hashtable used to store all active apps.
@@ -16,6 +17,7 @@ class REDIS_KEYS(enum.Enum):
     # channel name used to send messages to all apps that use output settings.
     SYS_OUTPUT_CHANNEL: str = "fd:system:output"
 
+
 INPUT_STREAM = "IN_STREAM"
 HDMI_INPUT_STREAM = "HDMI_STREAM"
 
@@ -23,12 +25,19 @@ OUTPUT_STREAM = "OUT_STREAM"
 
 
 class ScheduledFunction:
-    def __init__(self, function: Callable, args: Iterable, delay: float, periodic: bool=False, loop=asyncio.AbstractEventLoop):
+    def __init__(
+        self,
+        delay: float,
+        function: Callable,
+        args: Iterable,
+        periodic: bool = False,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
+    ):
         self.delay = delay
         self.function = function
         self.periodic = periodic
         self.started = False
-        self._loop = loop
+        self._loop = loop if loop is not None else asyncio.get_event_loop()
         self._args = args
         self._task = None
 

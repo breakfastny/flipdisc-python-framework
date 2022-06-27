@@ -10,32 +10,41 @@ pixel_pad = numpy.zeros((5, 5), numpy.uint8)
 pixel_pad[2, 2] = 1
 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
 
+
 def process_frame(app, subtopic, frame_num, bin_image):
-    scale = app.config['settings']['scale']
+    scale = app.config["settings"]["scale"]
     if scale > 1:
-        kronecker = app.config['settings']['kron']
+        kronecker = app.config["settings"]["kron"]
         if kronecker:
             bin_image = numpy.kron(bin_image, pixel_pad)
             bin_image = cv2.dilate(bin_image, kernel)
         else:
-            bin_image = cv2.resize(bin_image, None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST)
+            bin_image = cv2.resize(
+                bin_image, None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST
+            )
 
-    cv2.imshow('out', bin_image)
+    cv2.imshow("out", bin_image)
     cv2.waitKey(10)
 
 
 async def main():
-    app = Application("preview", 'sample_config.json',
-                        setup_input=False, setup_output=False, verbose=True)
+    app = Application(
+        "preview",
+        "sample_config.json",
+        setup_input=False,
+        setup_output=False,
+        verbose=True,
+    )
     await app.setup_redis()
-    app.config['settings'] = {'scale': 2, 'kron': False}
-    app.setup_input('output_stream', OUTPUT_STREAM, bind=False)
-    app.set_input_callback(process_frame, 'output_stream')
+    app.config["settings"] = {"scale": 2, "kron": False}
+    app.setup_input("output_stream", OUTPUT_STREAM, bind=False)
+    app.set_input_callback(process_frame, "output_stream")
 
     try:
         await app.run()
     finally:
         await app.cleanup()
+
 
 if __name__ == "__main__":
     try:

@@ -25,10 +25,10 @@ class Application(object):
         self,
         name: str,
         config: str,
-        setup_input: bool=True,
-        setup_output: bool=True,
-        setup_hdmi_input: bool=True,
-        verbose: bool=False,
+        setup_input: bool = True,
+        setup_output: bool = True,
+        setup_hdmi_input: bool = True,
+        verbose: bool = False,
     ) -> None:
         """
         An user app instance.
@@ -176,7 +176,8 @@ class Application(object):
             port=port,
             db=db,
             password=pwd,
-            retry_on_timeout=True)
+            retry_on_timeout=True,
+        )
 
         # And another redis connection for pubsub.
         self._red_sub = ReconnectingRedis(
@@ -185,14 +186,20 @@ class Application(object):
             port=port,
             db=db,
             password=pwd,
-            retry_on_timeout=True)
+            retry_on_timeout=True,
+        )
 
         if channels:
-            self._loop.create_task(self._red_sub.subscribe(self._on_redis_message , *channels))
-
+            self._loop.create_task(
+                self._red_sub.subscribe(self._on_redis_message, *channels)
+            )
 
     def setup_input(
-        self, cfg: str="input_stream", topic: str=INPUT_STREAM, bind: bool=False, watermark: int=0
+        self,
+        cfg: str = "input_stream",
+        topic: str = INPUT_STREAM,
+        bind: bool = False,
+        watermark: int = 0,
     ) -> None:
         """
         Configure a ZMQ PUB socket for the input stream.
@@ -223,9 +230,11 @@ class Application(object):
                     msg = await socket.recv_multipart()
                     callback(msg)
                 except:
-                    self._log.error('Error waiting for ZMQ stream message')
+                    self._log.error("Error waiting for ZMQ stream message")
 
-        self._in_stream[cfg] = self._loop.create_task(receive_stream(in_socket, callback))
+        self._in_stream[cfg] = self._loop.create_task(
+            receive_stream(in_socket, callback)
+        )
 
         self._log.debug(
             "SUB socket %s to %s, topic %s",
@@ -234,8 +243,9 @@ class Application(object):
             topic,
         )
 
-
-    def set_input_callback(self, function: Callable, stream: str="input_stream") -> None:
+    def set_input_callback(
+        self, function: Callable, stream: str = "input_stream"
+    ) -> None:
         """
         Define a callback to be invoked on messages received through
         the socket configured with setup_input.
@@ -252,7 +262,7 @@ class Application(object):
             self._log.error("expected output message of size %d, got %d", 3, len(msg))
             return
 
-        topic = msg[0].decode('UTF-8')
+        topic = msg[0].decode("UTF-8")
         subtopic = topic.split(":", 1)[1].rstrip(b"\x00") if ":" in topic else None
         frame_num = struct.unpack("i", msg[1])[0]
         binimage_frame = msg[2]
@@ -340,7 +350,9 @@ class Application(object):
 
         cb(app=self, frame_num=frame_num, bgr=bgr)
 
-    def setup_output(self, cfg: str="output_stream", bind: Optional[bool]=None) -> None:
+    def setup_output(
+        self, cfg: str = "output_stream", bind: Optional[bool] = None
+    ) -> None:
         """
         Configure a ZMQ PUB socket for the output stream.
         """
@@ -352,7 +364,7 @@ class Application(object):
         subtopic = ":%s" % subtopic if subtopic else ""
 
         self._out_socket = self._ctx.socket(zmq.PUB)
-        self._out_topic = bytes(OUTPUT_STREAM + subtopic, encoding='utf8')
+        self._out_topic = bytes(OUTPUT_STREAM + subtopic, encoding="utf8")
         if bind is None:
             bind = (not self._out_transition) and (not self._out_preview)
         if bind:
@@ -367,7 +379,9 @@ class Application(object):
             self._out_topic,
         )
 
-    async def send_output(self, result: numpy.ndarray, topic: Optional[str]=None) -> int:
+    async def send_output(
+        self, result: numpy.ndarray, topic: Optional[str] = None
+    ) -> int:
         """
         Publish result using the output socket configured by setup_output.
 
@@ -408,7 +422,9 @@ class Application(object):
         """
         self._redis_sub_callback = function
 
-    def add_periodic_callback(self, function: Callable, float_sec: float, start: bool=False) -> int:
+    def add_periodic_callback(
+        self, function: Callable, float_sec: float, start: bool = False
+    ) -> int:
         """
         Schedule function to be called once each n seconds. The callback
         will receive this instance as its sole argument.
@@ -416,7 +432,9 @@ class Application(object):
         The returned key can be used with stop_periodic_callback to stop
         the scheduling.
         """
-        periodic = ScheduledFunction(function, [self], float_sec, periodic=True, loop=self._loop)
+        periodic = ScheduledFunction(
+           float_sec, function, [self], periodic=True, loop=self._loop
+        )
         key = id(periodic)
         self._scheduled_functions[key] = periodic
         if start:
@@ -437,7 +455,7 @@ class Application(object):
         The returned handle can be used with cancel_call_later to cancel the
         future call.
         """
-        func = ScheduledFunction(function, [self], float_sec, False, self._loop)
+        func = ScheduledFunction(float_sec, function, [self], False, self._loop)
         func.start()
         return func
 
@@ -481,7 +499,7 @@ class Application(object):
         if self._cb_app_heartbeat:
             self._cb_app_heartbeat.stop()
         if self.name and self._red is not None:
-            # Unregister app from redis.            
+            # Unregister app from redis.
             await self._red.hdel(REDIS_KEYS.APPS.value, self._app_rkey)
             self._red.close()
             self._red_sub.close()
@@ -490,7 +508,9 @@ class Application(object):
         # Update register on redis to indicate that the app is running well.
         self.config["timestamp"] = time.time()
         try:
-            await self._red.hset(REDIS_KEYS.APPS.value, self._app_rkey, json.dumps(self.config))
+            await self._red.hset(
+                REDIS_KEYS.APPS.value, self._app_rkey, json.dumps(self.config)
+            )
         except:
             self._log.error("No redis configuration was found")
 
@@ -501,7 +521,12 @@ class Application(object):
         msg_channel = msg["channel"]
         content = msg["data"]
 
-        self._log.debug("Redis incoming, type: %s, channel: %s, msg: %s", msg_type, msg_channel, content)
+        self._log.debug(
+            "Redis incoming, type: %s, channel: %s, msg: %s",
+            msg_type,
+            msg_channel,
+            content,
+        )
 
         if msg_type != "message":
             return

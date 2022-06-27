@@ -6,12 +6,12 @@ import redis.asyncio
 
 from .common import REDIS_KEYS
 
-class ReconnectingRedis(redis.asyncio.Redis):
 
+class ReconnectingRedis(redis.asyncio.Redis):
     def __init__(self, suffix, host, port, db, password, retry_on_timeout):
         self._log = logging.getLogger(__name__)
         self._retry_delay = 1
-        self._name = 'redis%s' % ('-%s' % suffix if suffix else '')
+        self._name = "redis%s" % ("-%s" % suffix if suffix else "")
         self._host = host
         self._port = port
         self._pool = redis.asyncio.ConnectionPool(
@@ -19,7 +19,8 @@ class ReconnectingRedis(redis.asyncio.Redis):
             port=port,
             db=db,
             password=password,
-            retry_on_timeout=retry_on_timeout)
+            retry_on_timeout=retry_on_timeout,
+        )
         super().__init__(connection_pool=self._pool)
         self.psub = self.pubsub()
 
@@ -28,19 +29,21 @@ class ReconnectingRedis(redis.asyncio.Redis):
             try:
                 await self.psub.subscribe(*channels)
                 self._retry_delay = 1
-                self._log.debug('%s connected', self._name)
+                self._log.debug("%s connected", self._name)
 
                 while True:
                     async for msg in self.psub.listen():
                         callback(msg)
-                    await asyncio.sleep(.01)
+                    await asyncio.sleep(0.01)
 
             except Exception as err:
-                self._log.error('%s failed to connect to %s:%s - %s',
+                self._log.error(
+                    "%s failed to connect to %s:%s - %s",
                     self._name,
                     self._host,
                     self._port,
-                    err)
+                    err,
+                )
 
                 await self.psub.reset()
 
