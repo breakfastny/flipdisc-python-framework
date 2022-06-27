@@ -1,4 +1,3 @@
-import time
 import json
 import struct
 import logging
@@ -9,13 +8,14 @@ import collections
 import time
 from redis import RedisError
 
+import zmq
 import zmq.asyncio
 
 from .red import ReconnectingRedis
 from .common import REDIS_KEYS, INPUT_STREAM, HDMI_INPUT_STREAM, OUTPUT_STREAM
 from .common import ScheduledFunction
 
-from typing import Callable, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 __all__ = ["Application"]
 
@@ -24,7 +24,7 @@ class Application(object):
     def __init__(
         self,
         name: str,
-        config: str,
+        config: Union[Dict[Any, Any], str],
         setup_input: bool = True,
         setup_output: bool = True,
         setup_hdmi_input: bool = True,
@@ -60,22 +60,26 @@ class Application(object):
         * if setup_output is True a PUB socket for the output stream will be
           configured using config["output_stream"]
         """
-        config = config or {}
+
+        def load_config(config: Union[Dict[Any, Any], str]) -> Dict[Any, Any]:
+            loaded_config: Dict[Any, Any]
+            if not isinstance(config, dict):
+                # Load config from json file.
+                loaded_config = json.load(open(config))
+            else:
+                loaded_config = config
+            if "logging" in loaded_config:
+                logging.config.dictConfig(loaded_config["logging"])
+            else:
+                logging.basicConfig(
+                    level=logging.DEBUG if verbose else logging.INFO,
+                    format="%(asctime)s %(levelname)s %(name)s %(process)d %(message)s",
+                )
+            return loaded_config
+
         self.name = name
         self.verbose = verbose
-        if not isinstance(config, dict):
-            # Load config from json file.
-            config = json.load(open(config))
-        self.config = config
-
-        if "logging" in config:
-            logging.config.dictConfig(config["logging"])
-        else:
-            logging.basicConfig(
-                level=logging.DEBUG if verbose else logging.INFO,
-                format="%(asctime)s %(levelname)s %(name)s %(process)d %(message)s",
-            )
-
+        self.config: Dict[Any, Any] = load_config(config)
         self._log = logging.getLogger(__name__)
 
         self._loop = asyncio.get_event_loop()
@@ -88,9 +92,9 @@ class Application(object):
         self._input_callback = {}
         self._loop = asyncio.get_event_loop()
 
-        if "input_stream" in config:
-            input_width = config["input_stream"]["width"]
-            input_height = config["input_stream"]["height"]
+        if "input_stream" in self.config:
+            input_width = self.config["input_stream"]["width"]
+            input_height = self.config["input_stream"]["height"]
             self._bgr_shape = (input_height, input_width, 3)
             self._depth_shape = (input_height, input_width)
             self._sub_channels.append(REDIS_KEYS.SYS_INPUT_CHANNEL.value)
@@ -99,9 +103,9 @@ class Application(object):
             self._bgr_shape = None
             self._depth_shape = None
 
-        if "hdmi_stream" in config:
-            hdmi_width = config["hdmi_stream"]["width"]
-            hdmi_height = config["hdmi_stream"]["height"]
+        if "hdmi_stream" in self.config:
+            hdmi_width = self.config["hdmi_stream"]["width"]
+            hdmi_height = self.config["hdmi_stream"]["height"]
             self._hdmi_shape = (hdmi_height, hdmi_width, 3)
             self._sub_channels.append(REDIS_KEYS.SYS_HDMI_CHANNEL.value)
         else:
@@ -112,13 +116,13 @@ class Application(object):
         self._depth_dtype = "uint16"
         self._hdmi_dtype = "uint8"
 
-        if "output_stream" in config:
-            output_width = config["output_stream"]["width"]
-            output_height = config["output_stream"]["height"]
+        if "output_stream" in self.config:
+            output_width = self.config["output_stream"]["width"]
+            output_height = self.config["output_stream"]["height"]
             self._bin_shape = (output_height, output_width)
-            self._out_transition = config["output_stream"].get("transition", False)
-            self._out_preview = config["output_stream"].get("preview", False)
-            subtopic = config["output_stream"].get("subtopic")
+            self._out_transition = self.config["output_stream"].get("transition", False)
+            self._out_preview = self.config["output_stream"].get("preview", False)
+            subtopic = self.config["output_stream"].get("subtopic")
             self._sub_channels.append(REDIS_KEYS.SYS_OUTPUT_CHANNEL.value)
         else:
             setup_output = False
@@ -130,13 +134,12 @@ class Application(object):
         if self._out_transition and not self.name:
             raise ValueError("App name is required to use transitions")
 
+        self._app_rkey: Optional[str] = None
         if self.name:
             self._app_rkey = self.name
             if subtopic is not None:
                 self._app_rkey += ":" + subtopic
             self._sub_channels.append(REDIS_KEYS.APP_CHANNEL.value + self._app_rkey)
-        else:
-            self._app_rkey = None
 
         self._ctx = zmq.asyncio.Context()
         self._in_stream = {}
@@ -153,14 +156,13 @@ class Application(object):
     async def setup_redis(self):
         self._cb_app_heartbeat = None
         self._redis_sub_callback = None
-        self._red = None
+        self._red: Optional[ReconnectingRedis] = None
+        self._red_sub: Optional[ReconnectingRedis] = None
         self._pubsub = None
 
         config = self.config.get("redis", {})
 
         if config.get("enabled", True) == False:
-            self._red = None
-            self._red_sub = None
             return
 
         host = config.get("host", "localhost")
@@ -210,6 +212,7 @@ class Application(object):
 
         sock_address = self.config[cfg]["socket"]
         in_socket = self._ctx.socket(zmq.SUB)
+
         in_socket.setsockopt_string(zmq.SUBSCRIBE, topic)
         if watermark > 0:
             in_socket.set_hwm(watermark)
@@ -229,8 +232,9 @@ class Application(object):
                 try:
                     msg = await socket.recv_multipart()
                     callback(msg)
-                except:
+                except Exception as e:
                     self._log.error("Error waiting for ZMQ stream message")
+                    self._log.exception(e)
 
         self._in_stream[cfg] = self._loop.create_task(
             receive_stream(in_socket, callback)
@@ -262,8 +266,8 @@ class Application(object):
             self._log.error("expected output message of size %d, got %d", 3, len(msg))
             return
 
-        topic = msg[0].decode("UTF-8")
-        subtopic = topic.split(":", 1)[1].rstrip(b"\x00") if ":" in topic else None
+        topic = msg[0]
+        subtopic: Optional[bytes] = topic.split(b":", 1)[1].rstrip(b"\x00") if b":" in topic else None
         frame_num = struct.unpack("i", msg[1])[0]
         binimage_frame = msg[2]
 
@@ -380,7 +384,7 @@ class Application(object):
         )
 
     async def send_output(
-        self, result: numpy.ndarray, topic: Optional[str] = None
+        self, result: numpy.ndarray, topic: Optional[bytes] = None
     ) -> int:
         """
         Publish result using the output socket configured by setup_output.
@@ -500,16 +504,18 @@ class Application(object):
             self._cb_app_heartbeat.stop()
         if self.name and self._red is not None:
             # Unregister app from redis.
-            await self._red.hdel(REDIS_KEYS.APPS.value, self._app_rkey)
-            self._red.close()
-            self._red_sub.close()
+            await self._red.hdel(REDIS_KEYS.APPS.value, self._app_rkey) # type: ignore
+            if self._red is not None:
+                await self._red.close()
+            if self._red_sub is not None:
+                await self._red_sub.close()
 
     async def _app_heartbeat(self, app: "Application") -> None:
         # Update register on redis to indicate that the app is running well.
         self.config["timestamp"] = time.time()
         try:
-            await self._red.hset(
-                REDIS_KEYS.APPS.value, self._app_rkey, json.dumps(self.config)
+            await self._red.hset( # type: ignore
+                REDIS_KEYS.APPS.value, self._app_rkey, json.dumps(self.config) # type: ignore
             )
         except:
             self._log.error("No redis configuration was found")
@@ -535,7 +541,6 @@ class Application(object):
         if msg_channel.startswith(REDIS_KEYS.APP_CHANNEL.value):
             # Update app settings.
             _update_settings(self.config["settings"], data)
-            self._app_heartbeat()
         elif msg_channel == REDIS_KEYS.SYS_INPUT_CHANNEL.value:
             # Input stream update.
             _update_settings(self.config["input_stream"], data)

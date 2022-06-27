@@ -20,7 +20,7 @@ def process_frame(app, subtopic, frame_num, bin_image):
             bin_image = cv2.dilate(bin_image, kernel)
         else:
             bin_image = cv2.resize(
-                bin_image, None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST
+                bin_image, None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST # type: ignore
             )
 
     cv2.imshow("out", bin_image)
@@ -30,7 +30,7 @@ def process_frame(app, subtopic, frame_num, bin_image):
 async def main():
     app = Application(
         "preview",
-        "sample_config.json",
+        "sample_config.json", # type: ignore
         setup_input=False,
         setup_output=False,
         verbose=True,
