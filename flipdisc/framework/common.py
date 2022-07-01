@@ -6,16 +6,16 @@ from typing import Callable, Iterable, Optional
 class REDIS_KEYS(enum.Enum):
     # hashtable used to store all active apps.
     # key is an app name and the value is a json.dumps of all its settings.
-    APPS = "fd:apps"
+    APPS = b"fd:apps"
     # channel name used to send messages to specific apps.
     # When subscribing, use it as APP_CHANNEL + appname.
-    APP_CHANNEL = "fd:app:"
+    APP_CHANNEL = b"fd:app:"
     # channel name used to send messages to all apps that use input settings.
-    SYS_INPUT_CHANNEL = "fd:system:input"
+    SYS_INPUT_CHANNEL = b"fd:system:input"
     # channel name used to send messages to all apps that use hdmi settings.
-    SYS_HDMI_CHANNEL = "fd:system:hdmi"
+    SYS_HDMI_CHANNEL = b"fd:system:hdmi"
     # channel name used to send messages to all apps that use output settings.
-    SYS_OUTPUT_CHANNEL = "fd:system:output"
+    SYS_OUTPUT_CHANNEL = b"fd:system:output"
 
 
 INPUT_STREAM = "IN_STREAM"
