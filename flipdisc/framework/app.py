@@ -77,7 +77,7 @@ class Application(object):
                 )
             return loaded_config
 
-        self.name = name
+        self.name = str.encode(name)
         self.verbose = verbose
         self.config: Dict[Any, Any] = load_config(config)
         self._log = logging.getLogger(__name__)
@@ -134,11 +134,11 @@ class Application(object):
         if self._out_transition and not self.name:
             raise ValueError("App name is required to use transitions")
 
-        self._app_rkey: Optional[str] = None
+        self._app_rkey: Optional[bytes] = None
         if self.name:
             self._app_rkey = self.name
             if subtopic is not None:
-                self._app_rkey += ":" + subtopic
+                self._app_rkey += b":" + str.encode(subtopic)
             self._sub_channels.append(REDIS_KEYS.APP_CHANNEL.value + self._app_rkey)
 
         self._ctx = zmq.asyncio.Context()
@@ -538,17 +538,17 @@ class Application(object):
             return
 
         data = json.loads(content)
-        if msg_channel.startswith(REDIS_KEYS.APP_CHANNEL.value):
+        if msg_channel.startswith(REDIS_KEYS.APP_CHANNEL.value.decode()):
             # Update app settings.
             _update_settings(self.config["settings"], data)
-        elif msg_channel == REDIS_KEYS.SYS_INPUT_CHANNEL.value:
+        elif msg_channel == REDIS_KEYS.SYS_INPUT_CHANNEL.value.decode():
             # Input stream update.
             _update_settings(self.config["input_stream"], data)
             input_height = self.config["input_stream"]["height"]
             input_width = self.config["input_stream"]["width"]
             self._bgr_shape = (input_height, input_width, 3)
             self._depth_shape = (input_height, input_width)
-        elif msg_channel == REDIS_KEYS.SYS_OUTPUT_CHANNEL.value:
+        elif msg_channel == REDIS_KEYS.SYS_OUTPUT_CHANNEL.value.decode():
             # Output stream update.
             _update_settings(self.config["output_stream"], data)
             self._bin_shape = (
