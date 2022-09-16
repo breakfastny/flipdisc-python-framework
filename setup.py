@@ -21,12 +21,12 @@ setup(
     setup_requires=[
         "cffi>=1.0.0",
         "cython",
-        "numpy==1.21.6"
+        "numpy==1.22.0"
     ],
     cffi_modules=["flipdisc/build_particle.py:ffibuilder"],
     install_requires=[
         "cffi==1.15.0",
-        "numpy==1.21.6",
+        "numpy==1.22.0",
         "jsonschema==4.6.0",
         "pyzmq==23.2.0",
         "redis==4.3.3"
