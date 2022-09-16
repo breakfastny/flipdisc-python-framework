@@ -18,7 +18,11 @@ setup(
         "flipdisc.framework": ["*.json"],
     },
     python_requires='>=3.7.*',
-    setup_requires=["cffi>=1.0.0", "cython"],
+    setup_requires=[
+        "cffi>=1.0.0",
+        "cython",
+        "numpy==1.21.6"
+    ],
     cffi_modules=["flipdisc/build_particle.py:ffibuilder"],
     install_requires=[
         "cffi==1.15.0",
