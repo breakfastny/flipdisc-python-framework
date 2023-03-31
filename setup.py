@@ -29,7 +29,7 @@ setup(
         "numpy==1.21.6",
         "jsonschema==4.6.0",
         "pyzmq==23.2.0",
-        "redis==4.3.3"
+        "redis==4.4.4"
     ],
     ext_modules=[
         Extension(
