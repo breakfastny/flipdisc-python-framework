@@ -4,8 +4,16 @@ import numpy
 from flipdisc import util
 
 __all__ = [
-    'INTER_NEAREST', 'INTER_LINEAR', 'INTER_AREA', 'INTER_CUBIC', 'INTER_LANCZOS4',
-    'resize_stretch', 'resize_cover', 'resize_contain', 'resize_factor', 'load_image',
+    "INTER_NEAREST",
+    "INTER_LINEAR",
+    "INTER_AREA",
+    "INTER_CUBIC",
+    "INTER_LANCZOS4",
+    "resize_stretch",
+    "resize_cover",
+    "resize_contain",
+    "resize_factor",
+    "load_image",
 ]
 
 
@@ -13,16 +21,16 @@ __all__ = [
 INTER_NEAREST = cv2.INTER_NEAREST
 
 # A bilinear interpolation.
-INTER_LINEAR  = cv2.INTER_LINEAR
+INTER_LINEAR = cv2.INTER_LINEAR
 
 # Resampling using pixel area relation.
 # It may be a preferred method for image decimation,
 # as it gives moire'-free results. But when the image is zoomed,
 # it is similar to the INTER_NEAREST method.
-INTER_AREA    = cv2.INTER_AREA
+INTER_AREA = cv2.INTER_AREA
 
 # A bicubic interpolation over 4x4 pixel neighborhood.
-INTER_CUBIC   = cv2.INTER_CUBIC
+INTER_CUBIC = cv2.INTER_CUBIC
 
 # A Lanczos interpolation over 8x8 pixel neighborhood.
 INTER_LANCZOS4 = cv2.INTER_LANCZOS4
@@ -68,7 +76,7 @@ def resize_contain(im, out_size, bgcolor=0, interpolation=INTER_NEAREST):
         out1 = numpy.zeros((out.shape[0], out_size[0]) + (out.shape[2:]), out.dtype)
         if bgcolor:
             out1.fill(bgcolor)
-        out1[:, extra_width/2:-(extra_width/2 + one_more)] = out
+        out1[:, extra_width / 2 : -(extra_width / 2 + one_more)] = out
         out = out1
     if out.shape[0] < out_size[1]:
         extra_height = out_size[1] - out.shape[0]
@@ -76,7 +84,7 @@ def resize_contain(im, out_size, bgcolor=0, interpolation=INTER_NEAREST):
         out1 = numpy.zeros((out_size[1], out.shape[1]) + (out.shape[2:]), out.dtype)
         if bgcolor:
             out1.fill(bgcolor)
-        out1[extra_height/2:-(extra_height/2 + one_more), :] = out
+        out1[extra_height / 2 : -(extra_height / 2 + one_more), :] = out
         out = out1
 
     return out
@@ -93,8 +101,8 @@ def resize_factor(im, out, fx, fy, interpolation=None):
     Resize image and paste the result over the center of out; edges are
     cropped if necessary.
     """
-    assert fx > 0, 'fx must be positive'
-    assert fy > 0, 'fy must be positive'
+    assert fx > 0, "fx must be positive"
+    assert fy > 0, "fy must be positive"
 
     if interpolation is None:
         if fx < 1 or fy < 1:
@@ -102,7 +110,7 @@ def resize_factor(im, out, fx, fy, interpolation=None):
         else:
             interpolation = cv2.INTER_NEAREST
 
-    scaled_size = (int(fy*im.shape[1]), int(fx*im.shape[0]))
+    scaled_size = (int(fy * im.shape[1]), int(fx * im.shape[0]))
     if 0 in scaled_size:
         return out
 
@@ -111,8 +119,8 @@ def resize_factor(im, out, fx, fy, interpolation=None):
     oh, ow = out.shape[:2]
 
     x = y = ix = iy = 0
-    x2, y2 = x+ow, y+oh
-    ix2, iy2 = ix+iw, iy+ih
+    x2, y2 = x + ow, y + oh
+    ix2, iy2 = ix + iw, iy + ih
 
     if iw < ow:
         x = (ow - iw) / 2
@@ -128,7 +136,7 @@ def resize_factor(im, out, fx, fy, interpolation=None):
         iy = (ih - oh) / 2
         iy2 = iy + oh
 
-    out[y:y2,x:x2] = scaled[iy:iy2,ix:ix2]
+    out[y:y2, x:x2] = scaled[iy:iy2, ix:ix2]
     return out
 
 
@@ -155,11 +163,11 @@ def resize_cover(im, out_size, interpolation=INTER_NEAREST):
     if out.shape[1] > out_size[0]:
         extra_width = out.shape[1] - out_size[0]
         one_more = extra_width % 2
-        out = out[:, extra_width/2:-(extra_width/2 + one_more)]
+        out = out[:, extra_width / 2 : -(extra_width / 2 + one_more)]
     if out.shape[0] > out_size[1]:
         extra_height = out.shape[0] - out_size[1]
         one_more = extra_height % 2
-        out = out[extra_height/2:-(extra_height/2 + one_more), :]
+        out = out[extra_height / 2 : -(extra_height / 2 + one_more), :]
 
     return out
 

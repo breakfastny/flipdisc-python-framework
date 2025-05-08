@@ -185,7 +185,7 @@ def update_app(app):
     if curr_particles == app.particles_settings:
         return
     app.particles_settings = curr_particles.copy()
-    for key, value in app.particles_settings.items():
+    for key, value in list(app.particles_settings.items()):
         if key == 'reverse':
             app.optflow.update_settings(reverse=value)
             continue

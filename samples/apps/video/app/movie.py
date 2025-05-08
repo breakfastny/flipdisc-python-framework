@@ -3,7 +3,7 @@ import time
 import math
 import logging
 from multiprocessing import Process, Queue, Event
-from Queue import Empty as QueueEmpty
+from queue import Empty as QueueEmpty
 
 import av
 import av.filter
@@ -177,7 +177,7 @@ class Movie(object):
         )
 
         def decode():
-            print 'started decoding and queueing'
+            print('started decoding and queueing')
             container = av.open(filepath)
             streams = [container.streams[indx] for indx in stindex]
             prev_video_frame = None
@@ -247,8 +247,8 @@ class Movie(object):
                             prev_video_frame = frame_bgr.copy()
                         prev_video_ts = play_at or 0
                     else:
-                        print 'unknown frame', frame
-            print 'finished decoding and queueing'
+                        print('unknown frame', frame)
+            print('finished decoding and queueing')
 
         decode()
         finished.set()
