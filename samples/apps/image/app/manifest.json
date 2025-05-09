@@ -24,20 +24,6 @@
             "default": true
         },
         {
-            "label": "Pause Playlist During Interaction",
-            "name": "hold_during_interaction",
-            "type": "boolean",
-            "default": false
-        },
-        {
-            "label": "Playlist Pause Release Time",
-            "name": "hold_release_time",
-            "type": "number",
-            "default": 5.0,
-            "range": [0.25, 120.0],
-            "step": 0.25
-        },
-        {
             "title": "Image",
             "name": "background",
             "settings": [
@@ -85,6 +71,42 @@
                     "default": 1,
                     "range": [0.1, 10.0],
                     "step": 0.1
+                }
+            ]
+        },
+        {
+            "title": "Playlist Interaction Hold",
+            "name": "hold_playlist",
+            "settings": [
+                {
+                    "label": "Enabled",
+                    "name": "enabled",
+                    "type": "boolean",
+                    "default": false
+                },
+                {
+                    "label": "Release Time",
+                    "name": "release_time",
+                    "type": "number",
+                    "default": 5.0,
+                    "range": [0.25, 120.0],
+                    "step": 0.25
+                },
+                {
+                    "label": "Activity Threshold",
+                    "name": "activity_threshold",
+                    "type": "number",
+                    "default": 0.01,
+                    "range": [0.0, 1.0],
+                    "step": 0.001
+                },
+                {
+                    "label": "Time Threshold",
+                    "name": "time_threshold",
+                    "type": "number",
+                    "default": 0.35,
+                    "range": [0.0, 5.0],
+                    "step": 0.05
                 }
             ]
         },
