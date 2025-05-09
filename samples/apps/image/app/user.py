@@ -138,10 +138,13 @@ def _image_to_particles(emitter, im, transition=True):
 
 
 def update_hold_playlist(app):
+    """Returns True if holding is enabled, False if not. Return value is only
+    used to facilitate logging. If holding is enabled this will send a hold
+    message to the playlist scheduler every 250ms."""
 
     hold_enabled = app.config['settings']['hold_playlist']['enabled']
     if not hold_enabled:
-        return
+        return False
 
     # tell the playlist scheduler to hold the playlist, heartbeat style every 250ms.
     # the scheduler will release the hold after 500ms with no message.
@@ -151,6 +154,8 @@ def update_hold_playlist(app):
         channel = REDIS_KEYS.APP_CHANNEL + "scheduler"
         app.notify(channel, { "type": "hold_playlist" })
 
+    return True
+
 
 def update_app(app):
     if not app.config['settings']['run']:
@@ -158,7 +163,13 @@ def update_app(app):
 
     hold_release = app.config['settings']['hold_playlist']['release_time']
     if time.time() - app.last_user_present_at < hold_release:
-        update_hold_playlist(app)
+        holding_playlist = update_hold_playlist(app)
+    else:
+        holding_playlist = False
+
+    if holding_playlist != app.holding_playlist:
+        app.holding_playlist = holding_playlist
+        app.log.info("%sing playlist..." % ('Hold' if holding_playlist else 'Resum'))
 
     bg_cfg = app.config['settings']['background']
     bg_invert = bg_cfg['invert']
@@ -267,6 +278,7 @@ def main(cfg_path):
     app.activity_timer_start = None
     app.last_user_present_at = 0.0
     app.last_hold_message_at = 0.0
+    app.holding_playlist = False # Only for logging.
     app.add_periodic_callback(update_flow_30, 1/30.)
     app.add_periodic_callback(update_app, 1/60.)
     # Ensure the initial frame contains the logo.
