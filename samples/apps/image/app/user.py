@@ -90,6 +90,9 @@ def process_frame(app, frame_num, depth, bgr):
     user_mask = resize_func(user_mask, (app.width, app.height), interpolation=cv2.INTER_NEAREST)
     app.last_user_mask = user_mask
 
+    if (not cleared) and numpy.any(user_mask):
+        app.last_user_present_at = time.time()    
+
     update_flow(app)
     draw_and_send(app)
     app.last_frame_at = time.time()
@@ -124,9 +127,28 @@ def _image_to_particles(emitter, im, transition=True):
     pctx.spawn_radius_max, pctx.spawn_radius_min = prev_max, prev_min
 
 
+def update_hold_playlist(app):
+
+    hold_enabled = app.config['settings']['hold_during_interaction']
+    if not hold_enabled:
+        return
+
+    # tell the playlist scheduler to hold the playlist, heartbeat style every 250ms.
+    # the scheduler will release the hold after 500ms with no message.
+    now = time.time()
+    if now - app.last_hold_message_at >= 0.25:
+        app.last_hold_message_at = now
+        channel = REDIS_KEYS.APP_CHANNEL + "scheduler"
+        app.notify(channel, { "type": "hold_playlist" })
+
+
 def update_app(app):
     if not app.config['settings']['run']:
         return
+
+    hold_release = app.config['settings']['hold_release_time']
+    if time.time() - app.last_user_present_at < hold_release:
+        update_hold_playlist(app)
 
     bg_cfg = app.config['settings']['background']
     bg_invert = bg_cfg['invert']
@@ -232,6 +254,8 @@ def main(cfg_path):
     app.set_input_callback(process_frame)
     app.set_redis_callback(channel_update)
     app.last_frame_at = time.time()
+    app.last_user_present_at = 0.0
+    app.last_hold_message_at = time.time()
     app.add_periodic_callback(update_flow_30, 1/30.)
     app.add_periodic_callback(update_app, 1/60.)
     # Ensure the initial frame contains the logo.

@@ -24,6 +24,20 @@
             "default": true
         },
         {
+            "label": "Pause Playlist During Interaction",
+            "name": "hold_during_interaction",
+            "type": "boolean",
+            "default": false
+        },
+        {
+            "label": "Playlist Pause Release Time",
+            "name": "hold_release_time",
+            "type": "number",
+            "default": 5.0,
+            "range": [0.25, 120.0],
+            "step": 0.25
+        },
+        {
             "title": "Image",
             "name": "background",
             "settings": [
