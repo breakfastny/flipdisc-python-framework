@@ -165,28 +165,28 @@
                     "name": "trim_top",
                     "type": "integer",
                     "default": 0,
-                    "range": [0, 200]
+                    "range": [0, 2000]
                 },
                 {
                     "label": "Trim right",
                     "name": "trim_right",
                     "type": "integer",
                     "default": 26,
-                    "range": [0, 200]
+                    "range": [0, 2000]
                 },
                 {
                     "label": "Trim bottom",
                     "name": "trim_bottom",
                     "type": "integer",
                     "default": 25,
-                    "range": [0, 200]
+                    "range": [0, 2000]
                 },
                 {
                     "label": "Trim left",
                     "name": "trim_left",
                     "type": "integer",
                     "default": 19,
-                    "range": [0, 200]
+                    "range": [0, 2000]
                 },
                 {
                     "label": "Filter threshold",
