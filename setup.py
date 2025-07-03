@@ -11,7 +11,7 @@ def get_numpy_include():
 
 setup(
     name="flipdisc",
-    version="1.0.0",
+    version="1.0.1",
     url="https://github.com/breakfastny/flipdisc-python-framework",
     packages=["flipdisc", "flipdisc.framework"],
     package_data={
