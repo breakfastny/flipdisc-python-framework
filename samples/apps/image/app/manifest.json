@@ -75,6 +75,42 @@
             ]
         },
         {
+            "title": "Playlist Interaction Hold",
+            "name": "hold_playlist",
+            "settings": [
+                {
+                    "label": "Enabled",
+                    "name": "enabled",
+                    "type": "boolean",
+                    "default": false
+                },
+                {
+                    "label": "Release Time",
+                    "name": "release_time",
+                    "type": "number",
+                    "default": 5.0,
+                    "range": [0.25, 120.0],
+                    "step": 0.25
+                },
+                {
+                    "label": "Activity Threshold",
+                    "name": "activity_threshold",
+                    "type": "number",
+                    "default": 0.01,
+                    "range": [0.0, 1.0],
+                    "step": 0.001
+                },
+                {
+                    "label": "Time Threshold",
+                    "name": "time_threshold",
+                    "type": "number",
+                    "default": 0.35,
+                    "range": [0.0, 5.0],
+                    "step": 0.05
+                }
+            ]
+        },
+        {
             "visible": false,
             "title": "Display",
             "name": "display",
@@ -129,28 +165,28 @@
                     "name": "trim_top",
                     "type": "integer",
                     "default": 0,
-                    "range": [0, 200]
+                    "range": [0, 2000]
                 },
                 {
                     "label": "Trim right",
                     "name": "trim_right",
                     "type": "integer",
                     "default": 26,
-                    "range": [0, 200]
+                    "range": [0, 2000]
                 },
                 {
                     "label": "Trim bottom",
                     "name": "trim_bottom",
                     "type": "integer",
                     "default": 25,
-                    "range": [0, 200]
+                    "range": [0, 2000]
                 },
                 {
                     "label": "Trim left",
                     "name": "trim_left",
                     "type": "integer",
                     "default": 19,
-                    "range": [0, 200]
+                    "range": [0, 2000]
                 },
                 {
                     "label": "Filter threshold",

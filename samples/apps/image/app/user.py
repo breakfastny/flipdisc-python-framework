@@ -90,6 +90,19 @@ def process_frame(app, frame_num, depth, bgr):
     user_mask = resize_func(user_mask, (app.width, app.height), interpolation=cv2.INTER_NEAREST)
     app.last_user_mask = user_mask
 
+    hold_settings = app.config['settings']['hold_playlist']
+    if hold_settings['enabled']:
+        hold_activity_threshold = hold_settings['activity_threshold']
+        hold_time_threshold = hold_settings['time_threshold']
+        activity_threshold = user_mask.shape[0] * user_mask.shape[1] * hold_activity_threshold
+        now = time.time()
+        if cleared or numpy.count_nonzero(user_mask) < activity_threshold:
+            app.activity_timer_start = now
+        elif app.activity_timer_start is None:
+            app.activity_timer_start = now
+        if now - app.activity_timer_start > hold_time_threshold:
+            app.last_user_present_at = now
+
     update_flow(app)
     draw_and_send(app)
     app.last_frame_at = time.time()
@@ -124,9 +137,39 @@ def _image_to_particles(emitter, im, transition=True):
     pctx.spawn_radius_max, pctx.spawn_radius_min = prev_max, prev_min
 
 
+def update_hold_playlist(app):
+    """Returns True if holding is enabled, False if not. Return value is only
+    used to facilitate logging. If holding is enabled this will send a hold
+    message to the playlist scheduler every 250ms."""
+
+    hold_enabled = app.config['settings']['hold_playlist']['enabled']
+    if not hold_enabled:
+        return False
+
+    # tell the playlist scheduler to hold the playlist, heartbeat style every 250ms.
+    # the scheduler will release the hold after 500ms with no message.
+    now = time.time()
+    if now - app.last_hold_message_at >= 0.25:
+        app.last_hold_message_at = now
+        channel = REDIS_KEYS.APP_CHANNEL + "scheduler"
+        app.notify(channel, { "type": "hold_playlist" })
+
+    return True
+
+
 def update_app(app):
     if not app.config['settings']['run']:
         return
+
+    hold_release = app.config['settings']['hold_playlist']['release_time']
+    if time.time() - app.last_user_present_at < hold_release:
+        holding_playlist = update_hold_playlist(app)
+    else:
+        holding_playlist = False
+
+    if holding_playlist != app.holding_playlist:
+        app.holding_playlist = holding_playlist
+        app.log.info("%sing playlist..." % ('Hold' if holding_playlist else 'Resum'))
 
     bg_cfg = app.config['settings']['background']
     bg_invert = bg_cfg['invert']
@@ -232,6 +275,10 @@ def main(cfg_path):
     app.set_input_callback(process_frame)
     app.set_redis_callback(channel_update)
     app.last_frame_at = time.time()
+    app.activity_timer_start = None
+    app.last_user_present_at = 0.0
+    app.last_hold_message_at = 0.0
+    app.holding_playlist = False # Only for logging.
     app.add_periodic_callback(update_flow_30, 1/30.)
     app.add_periodic_callback(update_app, 1/60.)
     # Ensure the initial frame contains the logo.
