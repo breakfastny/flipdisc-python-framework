@@ -541,6 +541,7 @@ class Application(object):
         if msg_channel.startswith(REDIS_KEYS.APP_CHANNEL.value.decode()):
             # Update app settings.
             _update_settings(self.config["settings"], data)
+            await self._app_heartbeat()
         elif msg_channel == REDIS_KEYS.SYS_INPUT_CHANNEL.value.decode():
             # Input stream update.
             _update_settings(self.config["input_stream"], data)
