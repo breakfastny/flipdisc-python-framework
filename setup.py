@@ -1,49 +1,43 @@
 import os
 from setuptools import setup, Extension
 
-import numpy
 
-if os.getenv('USE_CYTHON', '0').lower() in ('0', 'f', 'false'):
-    CYTHON_BUILD = None
-    binarize_src = 'flipdisc/binarize.c'
-else:
-    from Cython.Distutils import build_ext as cython_build_ext
-    CYTHON_BUILD = cython_build_ext
-    binarize_src = 'flipdisc/binarize.pyx'
-binarize_ext = Extension('flipdisc.binarize', [binarize_src],
-        extra_compile_args=['-g0', '-O2'])
+def get_numpy_include():
+    """Helper for lazy-importing numpy to get includes"""
+    import numpy
+
+    return numpy.get_include()
 
 
-def run_setup():
-    extra = {
-        'ext_modules': [binarize_ext],
-        'include_dirs': [numpy.get_include()]
-    }
-    if CYTHON_BUILD:
-        extra['cmdclass'] = {'build_ext': CYTHON_BUILD}
-
-    setup(
-        name='flipdisc',
-        version='0.5.6',
-        url='https://github.com/breakfastny/flipdisc-python-framework',
-        packages=['flipdisc', 'flipdisc.framework'],
-        package_data={
-            'flipdisc.framework': ['*.json'],
-        },
-        setup_requires=['cffi>=1.0.0'],
-        cffi_modules=['flipdisc/build_particle.py:ffibuilder'],
-        install_requires=[
-            'cffi>=1.0.0',
-            'numpy==1.12.1',
-            'pyzmq==16.0.2',
-            'tornado==4.4.2',
-            'toredis==0.1.2',
-            'attrdict==2.0.0',
-            'jsonschema==2.6.0',
-        ],
-        zip_safe=False,
-        **extra
-    )
-
-
-run_setup()
+setup(
+    name="flipdisc",
+    version="1.0.1",
+    url="https://github.com/breakfastny/flipdisc-python-framework",
+    packages=["flipdisc", "flipdisc.framework"],
+    package_data={
+        "flipdisc.framework": ["*.json"],
+    },
+    python_requires='>=3.12',
+    setup_requires=[
+        "cffi<2",
+        "cython",
+        "numpy<2"
+    ],
+    cffi_modules=["flipdisc/build_particle.py:ffibuilder"],
+    install_requires=[
+        "cffi<2",
+        "numpy<2",
+        "jsonschema<5",
+        "pyzmq<28",
+        "redis<6"
+    ],
+    ext_modules=[
+        Extension(
+            "flipdisc.binarize",
+            ["flipdisc/binarize.pyx"],
+            extra_compile_args=["-g0", "-O2", "-march=native"],
+            include_dirs=(f() for f in [get_numpy_include]),
+        ),
+    ],
+    zip_safe=False,
+)
