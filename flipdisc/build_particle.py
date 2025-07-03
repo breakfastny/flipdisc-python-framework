@@ -21,7 +21,8 @@ def search_particle_h():
 
 ffibuilder = FFI()
 ffibuilder.set_source(
-    "flipdisc._particle", '#include "fdl/particle.h"', libraries=["fparticle"]
+    "flipdisc._particle", '#include "fdl/particle.h"', libraries=["fparticle"],
+    extra_compile_args=["-march=native"]
 )
 
 raw_cdef = open(search_particle_h()).read()
